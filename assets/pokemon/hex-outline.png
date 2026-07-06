@@ -1,0 +1,11 @@
+<svg preserveAspectRatio="none" width="100%" height="100%" overflow="visible" style="display: block;" viewBox="0 0 94 94" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="Elemento Outline">
+<path id="Vector" fill-rule="evenodd" clip-rule="evenodd" d="M0.00938361 46.732C-0.00312194 46.7107 -0.00312822 46.6842 0.00936688 46.6627L23.646 6.27841C23.6583 6.25746 23.6808 6.24457 23.7051 6.24457H70.554C70.5784 6.24457 70.601 6.25757 70.6133 6.2787L93.9907 46.6631C94.003 46.6842 94.003 46.7105 93.9907 46.7316L70.6133 87.0706C70.601 87.0917 70.5784 87.1048 70.554 87.1048H23.7051C23.6808 87.1048 23.6583 87.0919 23.646 87.071L0.00938361 46.732ZM68.7774 46.6747C68.7774 58.6979 59.0305 68.4447 47.0074 68.4447C34.9842 68.4447 25.2374 58.6979 25.2374 46.6747C25.2374 34.6513 34.9842 24.9047 47.0074 24.9047C59.0305 24.9047 68.7774 34.6513 68.7774 46.6747Z" fill="url(#paint0_linear_0_98)"/>
+</g>
+<defs>
+<linearGradient id="paint0_linear_0_98" x1="-9.40836" y1="12.3081" x2="47.0375" y2="115.067" gradientUnits="userSpaceOnUse">
+<stop stop-color="white"/>
+<stop offset="1" stop-color="white" stop-opacity="0"/>
+</linearGradient>
+</defs>
+</svg>
