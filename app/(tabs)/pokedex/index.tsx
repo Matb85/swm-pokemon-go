@@ -55,7 +55,7 @@ export default function PokedexScreen() {
     };
   }, []);
 
-  const loadPokemon = useCallback(async (nextOffset: number, reset = false) => {
+  const loadPokemon = async (nextOffset: number, reset = false) => {
     const page = await fetchPokemonListWithDetails(nextOffset, PAGE_SIZE);
 
     if (!isMountedRef.current) return;
@@ -63,7 +63,7 @@ export default function PokedexScreen() {
     setPokemon((current) => (reset ? page.pokemon : [...current, ...page.pokemon]));
     setOffset(nextOffset + PAGE_SIZE);
     setHasMore(page.hasMore);
-  }, []);
+  };
 
   useEffect(() => {
     loadPokemon(0, true)
