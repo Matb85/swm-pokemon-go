@@ -2,12 +2,14 @@ import { FilterButtons } from '@/components/pokemon/FilterButtons';
 import { PokemonCard } from '@/components/pokemon/PokemonCard';
 import { SearchBar } from '@/components/pokemon/SearchBar';
 import { Text } from '@/components/ui/text';
+import { useFavorites } from '@/hooks/useFavorites';
 import { formatPokemonName } from '@/lib/pokemon-types';
+import { scheduleIdleTask } from '@/lib/schedule-idle';
 import { fetchPokemonListWithDetails, type Pokemon } from '@/services/pokeapi';
 import { LegendList } from '@legendapp/list/react-native';
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, InteractionManager, RefreshControl, View } from 'react-native';
+import { ActivityIndicator, RefreshControl, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 const PAGE_SIZE = 20;
@@ -44,7 +46,7 @@ export default function PokedexScreen() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [canLoadMore, setCanLoadMore] = useState(false);
-  const [favorites, setFavorites] = useState<Set<number>>(new Set());
+  const { favoriteIds } = useFavorites();
 
   useEffect(() => {
     isMountedRef.current = true;
@@ -83,13 +85,11 @@ export default function PokedexScreen() {
       return;
     }
 
-    const task = InteractionManager.runAfterInteractions(() => {
+    return scheduleIdleTask(() => {
       if (isMountedRef.current) {
         setCanLoadMore(true);
       }
     });
-
-    return () => task.cancel();
   }, [loading]);
 
   const filteredPokemon = useMemo(() => {
@@ -141,30 +141,13 @@ export default function PokedexScreen() {
     [router]
   );
 
-  const toggleFavorite = useCallback((id: number) => {
-    setFavorites((current) => {
-      const next = new Set(current);
-      if (next.has(id)) {
-        next.delete(id);
-      } else {
-        next.add(id);
-      }
-      return next;
-    });
-  }, []);
-
   const renderItem = useCallback(
     ({ item }: { item: Pokemon }) => (
       <View style={{ marginBottom: ITEM_GAP }}>
-        <PokemonCard
-          pokemon={item}
-          isFavorite={favorites.has(item.id)}
-          onPress={() => handlePokemonPress(item.id)}
-          onToggleFavorite={() => toggleFavorite(item.id)}
-        />
+        <PokemonCard pokemon={item} onPress={() => handlePokemonPress(item.id)} />
       </View>
     ),
-    [favorites, handlePokemonPress, toggleFavorite]
+    [handlePokemonPress]
   );
 
   const keyExtractor = useCallback((item: Pokemon) => item.id.toString(), []);
@@ -195,6 +178,7 @@ export default function PokedexScreen() {
 
       <LegendList
         data={filteredPokemon}
+        extraData={favoriteIds}
         keyExtractor={keyExtractor}
         renderItem={renderItem}
         recycleItems
