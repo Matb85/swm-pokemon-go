@@ -3,24 +3,39 @@ import { PokemonCard } from '@/components/pokemon/PokemonCard';
 import { SearchBar } from '@/components/pokemon/SearchBar';
 import { Text } from '@/components/ui/text';
 import { formatPokemonName } from '@/lib/pokemon-types';
-import {
-  fetchPokemonListWithDetails,
-  type Pokemon,
-} from '@/services/pokeapi';
+import { fetchPokemonListWithDetails, type Pokemon } from '@/services/pokeapi';
+import { LegendList } from '@legendapp/list/react-native';
 import { useRouter } from 'expo-router';
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import {
-  ActivityIndicator,
-  FlatList,
-  RefreshControl,
-  View,
-} from 'react-native';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, InteractionManager, RefreshControl, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 const PAGE_SIZE = 20;
+const ITEM_HEIGHT = 102;
+const ITEM_GAP = 12;
+const LIST_ITEM_SIZE = ITEM_HEIGHT + ITEM_GAP;
+
+function ListHeader() {
+  return (
+    <View className="pb-4 pt-2">
+      <FilterButtons typeFilter="All types" sortOrder="A-Z" />
+    </View>
+  );
+}
+
+function EmptyList() {
+  return (
+    <View className="items-center py-12">
+      <Text className="text-base text-[#999]">No Pokémon found.</Text>
+    </View>
+  );
+}
 
 export default function PokedexScreen() {
   const router = useRouter();
+  const isMountedRef = useRef(false);
+  const loadMoreLockRef = useRef(false);
+
   const [search, setSearch] = useState('');
   const [pokemon, setPokemon] = useState<Pokemon[]>([]);
   const [offset, setOffset] = useState(0);
@@ -28,23 +43,54 @@ export default function PokedexScreen() {
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [canLoadMore, setCanLoadMore] = useState(false);
   const [favorites, setFavorites] = useState<Set<number>>(new Set());
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   const loadPokemon = useCallback(async (nextOffset: number, reset = false) => {
     const page = await fetchPokemonListWithDetails(nextOffset, PAGE_SIZE);
 
-    setPokemon((current) =>
-      reset ? page.pokemon : [...current, ...page.pokemon]
-    );
+    if (!isMountedRef.current) return;
+
+    setPokemon((current) => (reset ? page.pokemon : [...current, ...page.pokemon]));
     setOffset(nextOffset + PAGE_SIZE);
     setHasMore(page.hasMore);
   }, []);
 
   useEffect(() => {
     loadPokemon(0, true)
-      .catch(() => setPokemon([]))
-      .finally(() => setLoading(false));
+      .catch(() => {
+        if (isMountedRef.current) {
+          setPokemon([]);
+        }
+      })
+      .finally(() => {
+        if (isMountedRef.current) {
+          setLoading(false);
+        }
+      });
   }, [loadPokemon]);
+
+  useEffect(() => {
+    if (loading) {
+      setCanLoadMore(false);
+      return;
+    }
+
+    const task = InteractionManager.runAfterInteractions(() => {
+      if (isMountedRef.current) {
+        setCanLoadMore(true);
+      }
+    });
+
+    return () => task.cancel();
+  }, [loading]);
 
   const filteredPokemon = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -54,33 +100,46 @@ export default function PokedexScreen() {
       const name = item.name.toLowerCase();
       const formatted = formatPokemonName(item.name).toLowerCase();
       const id = item.id.toString();
-      return (
-        name.includes(query) ||
-        formatted.includes(query) ||
-        id.includes(query)
-      );
+      return name.includes(query) || formatted.includes(query) || id.includes(query);
     });
   }, [pokemon, search]);
 
   const handleRefresh = useCallback(async () => {
+    if (!isMountedRef.current) return;
+
     setRefreshing(true);
     try {
       await loadPokemon(0, true);
     } finally {
-      setRefreshing(false);
+      if (isMountedRef.current) {
+        setRefreshing(false);
+      }
     }
   }, [loadPokemon]);
 
   const handleLoadMore = useCallback(async () => {
+    if (!canLoadMore || !isMountedRef.current || loadMoreLockRef.current) return;
     if (!hasMore || loadingMore || loading || search.trim()) return;
 
+    loadMoreLockRef.current = true;
     setLoadingMore(true);
+
     try {
       await loadPokemon(offset);
     } finally {
-      setLoadingMore(false);
+      if (isMountedRef.current) {
+        setLoadingMore(false);
+      }
+      loadMoreLockRef.current = false;
     }
-  }, [hasMore, loadingMore, loading, search, offset, loadPokemon]);
+  }, [canLoadMore, hasMore, loadingMore, loading, search, offset, loadPokemon]);
+
+  const handlePokemonPress = useCallback(
+    (id: number) => {
+      router.push(`/pokedex/${id}`);
+    },
+    [router]
+  );
 
   const toggleFavorite = useCallback((id: number) => {
     setFavorites((current) => {
@@ -94,6 +153,34 @@ export default function PokedexScreen() {
     });
   }, []);
 
+  const renderItem = useCallback(
+    ({ item }: { item: Pokemon }) => (
+      <View style={{ marginBottom: ITEM_GAP }}>
+        <PokemonCard
+          pokemon={item}
+          isFavorite={favorites.has(item.id)}
+          onPress={() => handlePokemonPress(item.id)}
+          onToggleFavorite={() => toggleFavorite(item.id)}
+        />
+      </View>
+    ),
+    [favorites, handlePokemonPress, toggleFavorite]
+  );
+
+  const keyExtractor = useCallback((item: Pokemon) => item.id.toString(), []);
+
+  const getFixedItemSize = useCallback(() => LIST_ITEM_SIZE, []);
+
+  const listFooter = useMemo(
+    () =>
+      loadingMore ? (
+        <View className="py-4">
+          <ActivityIndicator color="#173EA5" />
+        </View>
+      ) : null,
+    [loadingMore]
+  );
+
   if (loading) {
     return (
       <SafeAreaView className="flex-1 items-center justify-center bg-white">
@@ -106,46 +193,20 @@ export default function PokedexScreen() {
     <SafeAreaView className="flex-1 bg-white" edges={['top']}>
       <SearchBar value={search} onChangeText={setSearch} />
 
-      <FlatList
+      <LegendList
         data={filteredPokemon}
-        keyExtractor={(item) => item.id.toString()}
-        contentContainerClassName="px-4 pb-4"
-        ItemSeparatorComponent={() => <View className="h-3" />}
-        ListHeaderComponent={
-          <View className="pb-4 pt-2">
-            <FilterButtons
-              typeFilter="All types"
-              sortOrder="A-Z"
-            />
-          </View>
-        }
-        renderItem={({ item }) => (
-          <PokemonCard
-            pokemon={item}
-            isFavorite={favorites.has(item.id)}
-            onPress={() => router.push(`/pokedex/${item.id}`)}
-            onToggleFavorite={() => toggleFavorite(item.id)}
-          />
-        )}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
-        }
+        keyExtractor={keyExtractor}
+        renderItem={renderItem}
+        recycleItems
+        estimatedItemSize={LIST_ITEM_SIZE}
+        getFixedItemSize={getFixedItemSize}
+        contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 16 }}
+        ListHeaderComponent={ListHeader}
+        ListEmptyComponent={EmptyList}
+        ListFooterComponent={listFooter}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
         onEndReached={handleLoadMore}
         onEndReachedThreshold={0.4}
-        ListEmptyComponent={
-          <View className="items-center py-12">
-            <Text className="text-base text-[#999]">
-              No Pokémon found.
-            </Text>
-          </View>
-        }
-        ListFooterComponent={
-          loadingMore ? (
-            <View className="py-4">
-              <ActivityIndicator color="#173EA5" />
-            </View>
-          ) : null
-        }
       />
     </SafeAreaView>
   );

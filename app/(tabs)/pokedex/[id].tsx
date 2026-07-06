@@ -1,11 +1,12 @@
+import { PokemonImage } from '@/components/pokemon/PokemonImage';
+import { TypeBadge } from '@/components/pokemon/TypeBadge';
 import { Text } from '@/components/ui/text';
-import { getTypeConfig, formatPokemonName } from '@/lib/pokemon-types';
+import { formatPokemonName, getTypeConfig } from '@/lib/pokemon-types';
 import { fetchPokemon } from '@/services/pokeapi';
 import { Stack, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Image, ScrollView, View } from 'react-native';
+import { ActivityIndicator, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { TypeBadge } from '@/components/pokemon/TypeBadge';
 
 export default function PokemonDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -46,11 +47,7 @@ export default function PokemonDetailScreen() {
               className="h-64 w-full items-center justify-center rounded-[15px]"
               style={{ backgroundColor: primaryColor }}>
               {pokemon.image ? (
-                <Image
-                  source={{ uri: pokemon.image }}
-                  className="size-52"
-                  resizeMode="contain"
-                />
+                <PokemonImage uri={pokemon.image} id={pokemon.id} size={208} />
               ) : null}
             </View>
 

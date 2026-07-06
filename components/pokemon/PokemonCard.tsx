@@ -2,8 +2,10 @@ import { Text } from '@/components/ui/text';
 import { formatPokemonName, getTypeConfig } from '@/lib/pokemon-types';
 import type { Pokemon } from '@/services/pokeapi';
 import { Heart } from 'lucide-react-native';
-import { Image, Pressable, View } from 'react-native';
+import { memo } from 'react';
+import { Pressable, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
+import { PokemonImage } from './PokemonImage';
 import { TypeBadge } from './TypeBadge';
 
 type PokemonCardProps = {
@@ -13,7 +15,7 @@ type PokemonCardProps = {
   onToggleFavorite?: () => void;
 };
 
-export function PokemonCard({
+export const PokemonCard = memo(function PokemonCard({
   pokemon,
   isFavorite = false,
   onPress,
@@ -46,11 +48,7 @@ export function PokemonCard({
         style={{ backgroundColor: primaryTypeColor }}>
         <HexOutline className="absolute size-[94px]" />
         {pokemon.image ? (
-          <Image
-            source={{ uri: pokemon.image }}
-            className="size-[94px]"
-            resizeMode="contain"
-          />
+          <PokemonImage uri={pokemon.image} id={pokemon.id} size={94} />
         ) : null}
         <Pressable
           onPress={onToggleFavorite}
@@ -67,7 +65,7 @@ export function PokemonCard({
       </View>
     </Pressable>
   );
-}
+});
 
 function HexOutline({ className }: { className?: string }) {
   return (

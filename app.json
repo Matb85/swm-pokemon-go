@@ -47,7 +47,8 @@
             "defaultLaunchURL": "http://10.0.0.2:8081"
           }
         }
-      ]
+      ],
+      "expo-image"
     ],
     "experiments": {
       "typedRoutes": true

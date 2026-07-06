@@ -12,6 +12,10 @@ export {
   ErrorBoundary,
 } from 'expo-router';
 
+export const unstable_settings = {
+  initialRouteName: '(tabs)',
+};
+
 export default function RootLayout() {
   const { colorScheme } = useColorScheme();
 
