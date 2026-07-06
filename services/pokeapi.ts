@@ -56,3 +56,10 @@ export async function fetchPokemonListWithDetails(offset: number, limit = 20) {
     hasMore: page.hasMore,
   };
 }
+
+export async function fetchPokemonByIds(ids: number[]): Promise<Pokemon[]> {
+  if (ids.length === 0) return [];
+
+  const pokemon = await Promise.all(ids.map((id) => fetchPokemon(id)));
+  return pokemon;
+}
