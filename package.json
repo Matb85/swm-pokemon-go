@@ -10,7 +10,11 @@
     "android": "expo start -c --android",
     "ios": "expo start -c --ios",
     "web": "expo start -c --web",
-    "clean": "rm -rf .expo node_modules"
+    "clean": "rm -rf .expo node_modules",
+    "format": "biome format --write .",
+    "lint": "biome lint .",
+    "check": "biome check .",
+    "check:fix": "biome check --write ."
   },
   "dependencies": {
     "@legendapp/list": "^3.3.1",
@@ -48,8 +52,6 @@
     "@babel/core": "^7.26.0",
     "@biomejs/biome": "2.5.2",
     "@types/react": "~19.2.10",
-    "prettier": "^3.8.3",
-    "prettier-plugin-tailwindcss": "^0.8.0",
     "typescript": "~6.0.3"
   },
   "private": true

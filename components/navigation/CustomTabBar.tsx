@@ -40,11 +40,7 @@ function PokedexIcon({ color, active }: TabIconProps) {
           strokeLinecap="round"
           strokeLinejoin="round"
         />
-        <Path
-          d="M2.16665 12.9997H9.74998M16.25 12.9997H23.8333"
-          stroke={color}
-          strokeWidth={1.5}
-        />
+        <Path d="M2.16665 12.9997H9.74998M16.25 12.9997H23.8333" stroke={color} strokeWidth={1.5} />
       </G>
     </Svg>
   );
@@ -135,9 +131,7 @@ export function CustomTabBar({ state, navigation }: BottomTabBarProps) {
               accessibilityState={isFocused ? { selected: true } : {}}>
               <config.Icon color={color} active={isFocused} />
               {config.label && isFocused ? (
-                <Text className="mt-[-2px] text-xs font-medium text-[#173ea5]">
-                  {config.label}
-                </Text>
+                <Text className="mt-[-2px] text-xs font-medium text-[#173ea5]">{config.label}</Text>
               ) : null}
             </Pressable>
           );

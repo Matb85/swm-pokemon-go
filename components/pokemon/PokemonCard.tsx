@@ -17,9 +17,7 @@ export function PokemonCard({ pokemon, onPress }: PokemonCardProps) {
   const { isFavorite, toggleFavorite } = useFavorites();
   const favorited = isFavorite(pokemon.id);
 
-  const primaryTypeColor = pokemon.types[0]
-    ? getTypeConfig(pokemon.types[0]).color
-    : '#5A8EA2';
+  const primaryTypeColor = pokemon.types[0] ? getTypeConfig(pokemon.types[0]).color : '#5A8EA2';
 
   return (
     <View className="relative h-[102px] flex-row overflow-hidden rounded-[15px] bg-[#ecf1f3]">
@@ -42,17 +40,12 @@ export function PokemonCard({ pokemon, onPress }: PokemonCardProps) {
           className="h-full w-[126px] items-center justify-center rounded-[15px]"
           style={{ backgroundColor: primaryTypeColor }}>
           <HexOutline className="absolute size-[94px]" />
-          {pokemon.image ? (
-            <PokemonImage uri={pokemon.image} id={pokemon.id} size={94} />
-          ) : null}
+          {pokemon.image ? <PokemonImage uri={pokemon.image} id={pokemon.id} size={94} /> : null}
         </View>
       </Pressable>
 
       <View className="absolute right-2 top-2 z-10">
-        <FavoriteButton
-          isFavorite={favorited}
-          onPress={() => toggleFavorite(pokemon.id)}
-        />
+        <FavoriteButton isFavorite={favorited} onPress={() => toggleFavorite(pokemon.id)} />
       </View>
     </View>
   );

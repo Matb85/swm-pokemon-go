@@ -18,10 +18,7 @@ export type PokemonTypeName =
   | 'steel'
   | 'fairy';
 
-export const POKEMON_TYPE_CONFIG: Record<
-  PokemonTypeName,
-  { color: string; label: string }
-> = {
+export const POKEMON_TYPE_CONFIG: Record<PokemonTypeName, { color: string; label: string }> = {
   normal: { color: '#A8A878', label: 'Normal' },
   fire: { color: '#F08030', label: 'Fire' },
   water: { color: '#6890F0', label: 'Water' },

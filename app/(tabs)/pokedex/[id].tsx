@@ -11,9 +11,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 export default function PokemonDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const [loading, setLoading] = useState(true);
-  const [pokemon, setPokemon] = useState<Awaited<ReturnType<typeof fetchPokemon>> | null>(
-    null
-  );
+  const [pokemon, setPokemon] = useState<Awaited<ReturnType<typeof fetchPokemon>> | null>(null);
 
   useEffect(() => {
     if (!id) return;
@@ -23,9 +21,7 @@ export default function PokemonDetailScreen() {
       .finally(() => setLoading(false));
   }, [id]);
 
-  const primaryColor = pokemon?.types[0]
-    ? getTypeConfig(pokemon.types[0]).color
-    : '#5A8EA2';
+  const primaryColor = pokemon?.types[0] ? getTypeConfig(pokemon.types[0]).color : '#5A8EA2';
 
   return (
     <>

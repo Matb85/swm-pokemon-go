@@ -18,9 +18,7 @@ function extractIdFromUrl(url: string) {
 }
 
 export async function fetchPokemonPage(offset: number, limit = 20) {
-  const response = await fetch(
-    `${POKEAPI_BASE}/pokemon?limit=${limit}&offset=${offset}`
-  );
+  const response = await fetch(`${POKEAPI_BASE}/pokemon?limit=${limit}&offset=${offset}`);
   const data = await response.json();
 
   return {
@@ -36,18 +34,14 @@ export async function fetchPokemon(id: number): Promise<Pokemon> {
   return {
     id: data.id,
     name: data.name,
-    image:
-      data.sprites.other?.['official-artwork']?.front_default ??
-      data.sprites.front_default,
+    image: data.sprites.other?.['official-artwork']?.front_default ?? data.sprites.front_default,
     types: data.types.map((entry: { type: { name: string } }) => entry.type.name),
   };
 }
 
 export async function fetchPokemonListWithDetails(offset: number, limit = 20) {
   const page = await fetchPokemonPage(offset, limit);
-  const ids = page.results
-    .map((result) => extractIdFromUrl(result.url))
-    .filter((id) => id > 0);
+  const ids = page.results.map((result) => extractIdFromUrl(result.url)).filter((id) => id > 0);
 
   const pokemon = await Promise.all(ids.map((id) => fetchPokemon(id)));
 

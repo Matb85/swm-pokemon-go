@@ -25,9 +25,7 @@ export function LocationBottomSheet({
 }: LocationBottomSheetProps) {
   const insets = useSafeAreaInsets();
   const bottomOffset = TAB_BAR_HEIGHT + insets.bottom + 12;
-  const primaryColor = pokemon?.types[0]
-    ? getTypeConfig(pokemon.types[0]).color
-    : '#5A8EA2';
+  const primaryColor = pokemon?.types[0] ? getTypeConfig(pokemon.types[0]).color : '#5A8EA2';
 
   return (
     <Animated.View
