@@ -1,5 +1,6 @@
 import { ActivityIndicator, View } from 'react-native';
 import { PokemonImage } from '@/components/pokemon/PokemonImage';
+import { PokemonStatsTable } from '@/components/pokemon/PokemonStatsTable';
 import { TypeBadge } from '@/components/pokemon/TypeBadge';
 import { Text } from '@/components/ui/text';
 import { formatPokemonName, getTypeConfig } from '@/lib/pokemon-types';
@@ -40,6 +41,8 @@ export function PokemonDetailContent({ pokemon, loading }: PokemonDetailContentP
           ))}
         </View>
       </View>
+
+      <PokemonStatsTable pokemon={pokemon} />
     </View>
   );
 }

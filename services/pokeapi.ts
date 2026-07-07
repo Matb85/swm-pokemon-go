@@ -1,11 +1,37 @@
 const POKEAPI_BASE = 'https://pokeapi.co/api/v2';
 
+export type PokemonStatName =
+  | 'hp'
+  | 'attack'
+  | 'defense'
+  | 'special-attack'
+  | 'special-defense'
+  | 'speed';
+
+export type PokemonStats = Record<PokemonStatName, number>;
+
 export type Pokemon = {
   id: number;
   name: string;
   image: string;
   types: string[];
+  height: number;
+  weight: number;
+  stats: PokemonStats;
 };
+
+const STAT_LABELS: Record<PokemonStatName, string> = {
+  hp: 'HP',
+  attack: 'Attack',
+  defense: 'Defense',
+  'special-attack': 'Sp. Atk',
+  'special-defense': 'Sp. Def',
+  speed: 'Speed',
+};
+
+export function getStatLabel(stat: PokemonStatName) {
+  return STAT_LABELS[stat];
+}
 
 type PokemonPageResult = {
   name: string;
@@ -27,6 +53,23 @@ export async function fetchPokemonPage(offset: number, limit = 20) {
   };
 }
 
+function parsePokemonStats(
+  entries: { stat: { name: string }; base_stat: number }[]
+): PokemonStats {
+  const stats = Object.fromEntries(
+    Object.keys(STAT_LABELS).map((name) => [name, 0])
+  ) as PokemonStats;
+
+  for (const entry of entries) {
+    const name = entry.stat.name as PokemonStatName;
+    if (name in STAT_LABELS) {
+      stats[name] = entry.base_stat;
+    }
+  }
+
+  return stats;
+}
+
 export async function fetchPokemon(id: number): Promise<Pokemon> {
   const response = await fetch(`${POKEAPI_BASE}/pokemon/${id}`);
   const data = await response.json();
@@ -36,6 +79,9 @@ export async function fetchPokemon(id: number): Promise<Pokemon> {
     name: data.name,
     image: data.sprites.other?.['official-artwork']?.front_default ?? data.sprites.front_default,
     types: data.types.map((entry: { type: { name: string } }) => entry.type.name),
+    height: data.height / 10,
+    weight: data.weight / 10,
+    stats: parsePokemonStats(data.stats),
   };
 }
 
