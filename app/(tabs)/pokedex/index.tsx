@@ -1,4 +1,9 @@
+import { LegendList } from '@legendapp/list/react-native';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, RefreshControl, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { FilterButtons } from '@/components/pokemon/FilterButtons';
+import { usePokemonBottomSheet } from '@/components/pokemon/PokemonBottomSheet';
 import { PokemonCard } from '@/components/pokemon/PokemonCard';
 import { SearchBar } from '@/components/pokemon/SearchBar';
 import { Text } from '@/components/ui/text';
@@ -6,11 +11,6 @@ import { useFavorites } from '@/hooks/useFavorites';
 import { formatPokemonName } from '@/lib/pokemon-types';
 import { scheduleIdleTask } from '@/lib/schedule-idle';
 import { fetchPokemonListWithDetails, type Pokemon } from '@/services/pokeapi';
-import { LegendList } from '@legendapp/list/react-native';
-import { useRouter } from 'expo-router';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, RefreshControl, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 
 const PAGE_SIZE = 20;
 const ITEM_HEIGHT = 102;
@@ -34,7 +34,7 @@ function EmptyList() {
 }
 
 export default function PokedexScreen() {
-  const router = useRouter();
+  const { openPokemon } = usePokemonBottomSheet();
   const isMountedRef = useRef(false);
   const loadMoreLockRef = useRef(false);
 
@@ -136,9 +136,9 @@ export default function PokedexScreen() {
 
   const handlePokemonPress = useCallback(
     (id: number) => {
-      router.push(`/pokedex/${id}`);
+      openPokemon(id);
     },
-    [router]
+    [openPokemon]
   );
 
   const renderItem = useCallback(

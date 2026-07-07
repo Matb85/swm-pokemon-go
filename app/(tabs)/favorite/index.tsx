@@ -1,12 +1,12 @@
+import { LegendList } from '@legendapp/list/react-native';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { usePokemonBottomSheet } from '@/components/pokemon/PokemonBottomSheet';
 import { PokemonCard } from '@/components/pokemon/PokemonCard';
 import { Text } from '@/components/ui/text';
 import { useFavorites } from '@/hooks/useFavorites';
 import { fetchPokemonByIds, type Pokemon } from '@/services/pokeapi';
-import { LegendList } from '@legendapp/list/react-native';
-import { useRouter } from 'expo-router';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 
 const ITEM_HEIGHT = 102;
 const ITEM_GAP = 12;
@@ -24,7 +24,7 @@ function EmptyFavorites() {
 }
 
 export default function FavoriteScreen() {
-  const router = useRouter();
+  const { openPokemon } = usePokemonBottomSheet();
   const isMountedRef = useRef(false);
   const { favoriteIds } = useFavorites();
 
@@ -68,9 +68,9 @@ export default function FavoriteScreen() {
 
   const handlePokemonPress = useCallback(
     (id: number) => {
-      router.push(`/pokedex/${id}`);
+      openPokemon(id);
     },
-    [router]
+    [openPokemon]
   );
 
   const renderItem = useCallback(

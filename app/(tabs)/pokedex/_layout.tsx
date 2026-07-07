@@ -7,13 +7,6 @@ export default function PokedexLayout() {
         headerShown: false,
       }}>
       <Stack.Screen name="index" />
-      <Stack.Screen
-        name="[id]"
-        options={{
-          headerShown: true,
-          presentation: 'card',
-        }}
-      />
     </Stack>
   );
 }
