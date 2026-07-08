@@ -7,6 +7,16 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     ...config,
     name: config.name ?? 'swm-pokemon-go',
     slug: config.slug ?? 'swm-pokemon-go',
+    plugins: [
+      ...(config.plugins ?? []),
+      [
+        'expo-location',
+        {
+          locationWhenInUsePermission:
+            'Allow $(PRODUCT_NAME) to use your location to center the map on your position.',
+        },
+      ],
+    ],
     ios: {
       ...config.ios,
       infoPlist: {

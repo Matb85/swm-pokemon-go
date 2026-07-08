@@ -1,69 +1,55 @@
-import { LocationBottomSheet } from '@/components/map/LocationBottomSheet';
+import Mapbox, { Camera, type CameraRef, MapView, MarkerView } from '@rnmapbox/maps';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { View } from 'react-native';
+import { AddPinBottomSheet, type AddPinBottomSheetRef } from '@/components/map/AddPinBottomSheet';
+import { LocateMeButton } from '@/components/map/LocateMeButton';
+import { MapPinsBottomSheet } from '@/components/map/MapPinsBottomSheet';
 import { PokeballPin } from '@/components/map/PokeballPin';
-import {
-  DISCOVERED_LOCATIONS,
-  MAP_DEFAULT_CENTER,
-  MAP_DEFAULT_ZOOM,
-  type DiscoveredLocation,
-} from '@/lib/map-locations';
+import { useMapPins } from '@/hooks/useMapPins';
+import { createMapPin, MAP_DEFAULT_CENTER, MAP_DEFAULT_ZOOM } from '@/lib/map-locations';
 import { ensureMapboxInitialized } from '@/lib/mapbox';
-import { fetchPokemon } from '@/services/pokeapi';
-import Mapbox, { Camera, MapView, MarkerView } from '@rnmapbox/maps';
-import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, View } from 'react-native';
+import { getUserCoordinate } from '@/lib/user-location';
+
+const USER_LOCATION_ZOOM = 15;
 
 export function MapContent() {
-  const [selectedLocation, setSelectedLocation] = useState<DiscoveredLocation | null>(null);
-  const [selectedPokemon, setSelectedPokemon] = useState<Awaited<
-    ReturnType<typeof fetchPokemon>
-  > | null>(null);
-  const [loadingPokemon, setLoadingPokemon] = useState(false);
+  const { pins, addPin, removePin } = useMapPins();
+  const addPinSheetRef = useRef<AddPinBottomSheetRef>(null);
+  const cameraRef = useRef<CameraRef>(null);
+  const [pendingCoordinate, setPendingCoordinate] = useState<[number, number] | null>(null);
 
   useEffect(() => {
     ensureMapboxInitialized();
   }, []);
 
-  useEffect(() => {
-    if (!selectedLocation) {
-      setSelectedPokemon(null);
-      return;
-    }
+  const handleMapLongPress = useCallback((feature: GeoJSON.Feature) => {
+    const geometry = feature.geometry;
+    if (geometry.type !== 'Point') return;
 
-    let cancelled = false;
-    setLoadingPokemon(true);
-
-    fetchPokemon(selectedLocation.pokemonId)
-      .then((pokemon) => {
-        if (!cancelled) {
-          setSelectedPokemon(pokemon);
-        }
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setSelectedPokemon(null);
-        }
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setLoadingPokemon(false);
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [selectedLocation]);
-
-  const handleSelectLocation = useCallback((location: DiscoveredLocation) => {
-    setSelectedLocation((current) => (current?.id === location.id ? null : location));
+    const coordinate = geometry.coordinates as [number, number];
+    setPendingCoordinate(coordinate);
+    addPinSheetRef.current?.present(coordinate);
   }, []);
 
-  const handleCloseSheet = useCallback(() => {
-    setSelectedLocation(null);
-  }, []);
+  const handleSelectPokemon = useCallback(
+    (pokemonId: number) => {
+      if (!pendingCoordinate) return;
 
-  const handleMapPress = useCallback(() => {
-    setSelectedLocation(null);
+      addPin(createMapPin(pokemonId, pendingCoordinate));
+      setPendingCoordinate(null);
+    },
+    [addPin, pendingCoordinate]
+  );
+
+  const handleLocateMe = useCallback(async () => {
+    const coordinate = await getUserCoordinate();
+    if (!coordinate) return;
+
+    cameraRef.current?.setCamera({
+      centerCoordinate: coordinate,
+      zoomLevel: USER_LOCATION_ZOOM,
+      animationDuration: 1000,
+    });
   }, []);
 
   return (
@@ -75,50 +61,35 @@ export function MapContent() {
         scaleBarEnabled={false}
         logoEnabled={false}
         attributionEnabled={false}
-        onPress={handleMapPress}>
+        onLongPress={handleMapLongPress}>
         <Camera
+          ref={cameraRef}
           defaultSettings={{
             centerCoordinate: MAP_DEFAULT_CENTER,
             zoomLevel: MAP_DEFAULT_ZOOM,
           }}
         />
 
-        {DISCOVERED_LOCATIONS.map((location) => {
-          const isSelected = selectedLocation?.id === location.id;
-
-          return (
-            <MarkerView
-              key={location.id}
-              coordinate={location.coordinate}
-              anchor={{ x: 0.5, y: 0.5 }}
-              allowOverlap
-              isSelected={isSelected}>
-              <Pressable
-                onPress={() => handleSelectLocation(location)}
-                accessibilityRole="button"
-                accessibilityLabel={`Discovered Pokémon location ${location.id}`}
-                hitSlop={8}>
-                <PokeballPin selected={isSelected} />
-              </Pressable>
-            </MarkerView>
-          );
-        })}
+        {pins.map((pin) => (
+          <MarkerView
+            key={pin.id}
+            coordinate={pin.coordinate}
+            anchor={{ x: 0.5, y: 0.5 }}
+            allowOverlap>
+            <PokeballPin />
+          </MarkerView>
+        ))}
       </MapView>
 
-      {loadingPokemon && selectedLocation && !selectedPokemon ? (
-        <View className="absolute inset-x-0 top-16 items-center">
-          <ActivityIndicator color="#173EA5" />
-        </View>
-      ) : null}
+      <LocateMeButton onLocate={handleLocateMe} />
 
-      {selectedLocation ? (
-        <LocationBottomSheet
-          location={selectedLocation}
-          pokemon={selectedPokemon}
-          loading={loadingPokemon}
-          onClose={handleCloseSheet}
-        />
-      ) : null}
+      <MapPinsBottomSheet pins={pins} onDeletePin={removePin} />
+
+      <AddPinBottomSheet
+        ref={addPinSheetRef}
+        onSelectPokemon={handleSelectPokemon}
+        onDismiss={() => setPendingCoordinate(null)}
+      />
     </View>
   );
 }

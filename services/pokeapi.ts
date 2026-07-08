@@ -53,9 +53,27 @@ export async function fetchPokemonPage(offset: number, limit = 20) {
   };
 }
 
-function parsePokemonStats(
-  entries: { stat: { name: string }; base_stat: number }[]
-): PokemonStats {
+const typePokemonIdsCache = new Map<string, number[]>();
+
+export async function fetchPokemonIdsByType(typeName: string): Promise<number[]> {
+  const cached = typePokemonIdsCache.get(typeName);
+  if (cached) return cached;
+
+  const response = await fetch(`${POKEAPI_BASE}/type/${typeName}`);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch type: ${typeName}`);
+  }
+
+  const data = await response.json();
+  const ids = (data.pokemon as { pokemon: { url: string } }[])
+    .map((entry) => extractIdFromUrl(entry.pokemon.url))
+    .filter((id) => id > 0);
+
+  typePokemonIdsCache.set(typeName, ids);
+  return ids;
+}
+
+function parsePokemonStats(entries: { stat: { name: string }; base_stat: number }[]): PokemonStats {
   const stats = Object.fromEntries(
     Object.keys(STAT_LABELS).map((name) => [name, 0])
   ) as PokemonStats;
@@ -85,10 +103,28 @@ export async function fetchPokemon(id: number): Promise<Pokemon> {
   };
 }
 
-export async function fetchPokemonListWithDetails(offset: number, limit = 20) {
+export type FetchPokemonListOptions = {
+  type?: string | null;
+};
+
+export async function fetchPokemonListWithDetails(
+  offset: number,
+  limit = 20,
+  options: FetchPokemonListOptions = {}
+) {
+  if (options.type) {
+    const allIds = await fetchPokemonIdsByType(options.type);
+    const pageIds = allIds.slice(offset, offset + limit);
+    const pokemon = await Promise.all(pageIds.map((id) => fetchPokemon(id)));
+
+    return {
+      pokemon,
+      hasMore: offset + limit < allIds.length,
+    };
+  }
+
   const page = await fetchPokemonPage(offset, limit);
   const ids = page.results.map((result) => extractIdFromUrl(result.url)).filter((id) => id > 0);
-
   const pokemon = await Promise.all(ids.map((id) => fetchPokemon(id)));
 
   return {
