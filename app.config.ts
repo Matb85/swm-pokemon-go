@@ -21,11 +21,14 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       ...config.ios,
       infoPlist: {
         ...config.ios?.infoPlist,
+        NSCameraUsageDescription:
+          'Allow $(PRODUCT_NAME) to access your camera to try on Pokémon.',
         MBXAccessToken: mapboxToken,
       },
     },
     android: {
       ...config.android,
+      permissions: [...(config.android?.permissions ?? []), 'android.permission.CAMERA'],
       // @ts-expect-error Expo supports stringResource but types may lag
       stringResource: {
         mapbox_access_token: mapboxToken,

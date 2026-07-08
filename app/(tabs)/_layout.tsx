@@ -18,7 +18,7 @@ export default function TabLayout() {
         <Tabs.Screen name="pokedex" />
         <Tabs.Screen name="map" />
         <Tabs.Screen name="favorite" />
-        <Tabs.Screen name="profile" />
+        <Tabs.Screen name="camera" />
       </Tabs>
     </PokemonBottomSheetProvider>
   );

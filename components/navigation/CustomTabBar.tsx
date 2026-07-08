@@ -1,5 +1,5 @@
 import { Text } from '@/components/ui/text';
-import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
+import type { BottomTabBarProps } from 'expo-router/js-tabs';
 import { Pressable, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Circle, G, Path } from 'react-native-svg';
@@ -75,17 +75,16 @@ function FavoriteIcon({ color }: TabIconProps) {
   );
 }
 
-function ProfileIcon({ color }: TabIconProps) {
+function CameraIcon({ color }: TabIconProps) {
   return (
-    <Svg width={28} height={28} viewBox="0 0 28 28" fill="none">
-      <Circle cx={14} cy={14} r={12} stroke={color} strokeWidth={1.5} />
-      <Circle cx={14} cy={11} r={4} stroke={color} strokeWidth={1.5} />
+    <Svg width={26} height={26} viewBox="0 0 26 26" fill="none">
       <Path
-        d="M6 22.5C7.5 18.5 10.5 16.5 14 16.5C17.5 16.5 20.5 18.5 22 22.5"
+        d="M4 9.5C4 8.39543 4.89543 7.5 6 7.5H8.17157C8.70201 7.5 9.21071 7.28929 9.58579 6.91421L10.4142 6.08579C10.7893 5.71071 11.298 5.5 11.8284 5.5H14.1716C14.702 5.5 15.2107 5.71071 15.5858 6.08579L16.4142 6.91421C16.7893 7.28929 17.298 7.5 17.8284 7.5H20C21.1046 7.5 22 8.39543 22 9.5V18.5C22 19.6046 21.1046 20.5 20 20.5H6C4.89543 20.5 4 19.6046 4 18.5V9.5Z"
         stroke={color}
         strokeWidth={1.5}
-        strokeLinecap="round"
+        strokeLinejoin="round"
       />
+      <Circle cx={13} cy={14} r={4} stroke={color} strokeWidth={1.5} />
     </Svg>
   );
 }
@@ -94,7 +93,7 @@ const TAB_CONFIG = [
   { name: 'pokedex', label: 'Pokédex', Icon: PokedexIcon },
   { name: 'map', label: null, Icon: MapIcon },
   { name: 'favorite', label: null, Icon: FavoriteIcon },
-  { name: 'profile', label: null, Icon: ProfileIcon },
+  { name: 'camera', label: null, Icon: CameraIcon },
 ] as const;
 
 export function CustomTabBar({ state, navigation }: BottomTabBarProps) {
