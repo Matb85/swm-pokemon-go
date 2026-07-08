@@ -1,48 +1,49 @@
-import { Text } from '@/components/ui/text';
-import { getPokemonOverlayPosition, POKEMON_SPRITE_SIZE } from '@/lib/face-overlay';
-import { fetchPokemon, type Pokemon } from '@/services/pokeapi';
-import { useIsFocused } from 'expo-router';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Text } from "@/components/ui/text";
+import { getPokemonOverlayPosition, POKEMON_SPRITE_SIZE } from "@/lib/face-overlay";
+import { fetchPokemon, type Pokemon } from "@/services/pokeapi";
+import { useIsFocused } from "expo-router";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { AppState, Pressable, StyleSheet, useWindowDimensions, View } from "react-native";
+import Animated, { useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
-  AppState,
-  Pressable,
-  StyleSheet,
-  useWindowDimensions,
-  View,
-} from 'react-native';
-import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import {
+  Camera,
+  CommonResolutions,
   useCameraDevice,
   useCameraPermission,
   usePhotoOutput,
   type CameraPosition,
   type CameraRef,
-} from 'react-native-vision-camera';
-import {
-  Camera,
-  type Face,
-} from 'react-native-vision-camera-face-detector';
-import { FlipCameraButton } from './FlipCameraButton';
-import { HeadSilhouette, SILHOUETTE_HEIGHT, SILHOUETTE_WIDTH } from './HeadSilhouette';
-import { PokemonOverlay } from './PokemonOverlay';
-import { ShutterButton } from './ShutterButton';
+  type Constraint,
+} from "react-native-vision-camera";
+import { useFaceDetectorOutput, type Face } from "react-native-vision-camera-face-detector";
+import { FlipCameraButton } from "./FlipCameraButton";
+import { HeadSilhouette, SILHOUETTE_HEIGHT, SILHOUETTE_WIDTH } from "./HeadSilhouette";
+import { PokemonOverlay } from "./PokemonOverlay";
+import { ShutterButton } from "./ShutterButton";
 
 const PIKACHU_ID = 25;
+const OVERLAY_POSITION_THRESHOLD = 4;
 
 export function CameraViewfinder() {
   const isFocused = useIsFocused();
   const insets = useSafeAreaInsets();
   const { width, height } = useWindowDimensions();
   const cameraRef = useRef<CameraRef>(null);
-  const photoOutput = usePhotoOutput();
+  const photoOutput = usePhotoOutput({
+    targetResolution: CommonResolutions.HD_4_3,
+    qualityPrioritization: "speed",
+    quality: 0.8,
+  });
   const isMountedRef = useRef(false);
   const { hasPermission, requestPermission, canRequestPermission } = useCameraPermission();
   const [pokemon, setPokemon] = useState<Pokemon | null>(null);
   const [isCapturing, setIsCapturing] = useState(false);
-  const [cameraFacing, setCameraFacing] = useState<CameraPosition>('front');
+  const [cameraFacing, setCameraFacing] = useState<CameraPosition>("front");
   const [hasFace, setHasFace] = useState(false);
-  const [appIsActive, setAppIsActive] = useState(AppState.currentState === 'active');
+  const [appIsActive, setAppIsActive] = useState(AppState.currentState === "active");
+  const hasFaceRef = useRef(false);
+  const lastOverlayPositionRef = useRef({ left: 0, top: 0 });
 
   const overlayX = useSharedValue(0);
   const overlayY = useSharedValue(0);
@@ -51,19 +52,78 @@ export function CameraViewfinder() {
   const cameraDevice = useCameraDevice(cameraFacing);
   const isCameraActive = isFocused && appIsActive && hasPermission && !!cameraDevice;
 
-  const faceDetectorOptions = useMemo(
+  const faceDetectorSettings = useMemo(
     () => ({
-      performanceMode: 'fast' as const,
-      runLandmarks: true,
-      runContours: true,
+      performanceMode: "fast" as const,
+      runLandmarks: cameraFacing === "front",
+      runContours: false,
+      runClassifications: false,
       autoMode: true,
       windowWidth: width,
       windowHeight: height,
       cameraFacing,
-      minFaceSize: 0.15,
+      minFaceSize: cameraFacing === "back" ? 0.12 : 0.15,
       trackingEnabled: true,
+      outputResolution: "preview" as const,
     }),
     [cameraFacing, height, width],
+  );
+
+  const handleFacesDetected = useCallback(
+    (faces: Face[]) => {
+      if (faces.length === 0) {
+        if (hasFaceRef.current) {
+          hasFaceRef.current = false;
+          setHasFace(false);
+        }
+        overlayOpacity.value = withTiming(0, { duration: 150 });
+        return;
+      }
+
+      const face = faces[0];
+      const position = getPokemonOverlayPosition(face.bounds, face.landmarks, face.contours);
+
+      if (!hasFaceRef.current) {
+        hasFaceRef.current = true;
+        setHasFace(true);
+        overlayOpacity.value = withTiming(1, { duration: 100 });
+        lastOverlayPositionRef.current = position;
+        overlayX.value = position.left;
+        overlayY.value = position.top;
+        return;
+      }
+
+      const deltaX = Math.abs(position.left - lastOverlayPositionRef.current.left);
+      const deltaY = Math.abs(position.top - lastOverlayPositionRef.current.top);
+      if (deltaX < OVERLAY_POSITION_THRESHOLD && deltaY < OVERLAY_POSITION_THRESHOLD) {
+        return;
+      }
+
+      lastOverlayPositionRef.current = position;
+      overlayX.value = position.left;
+      overlayY.value = position.top;
+    },
+    [overlayOpacity, overlayX, overlayY],
+  );
+
+  const handleFaceDetectionError = useCallback((error: Error) => {
+    console.error("Face detection error:", error);
+  }, []);
+
+  const faceDetectorOutput = useFaceDetectorOutput({
+    ...faceDetectorSettings,
+    onFacesDetected: handleFacesDetected,
+    onError: handleFaceDetectionError,
+  });
+
+  const constraints = useMemo(
+    () =>
+      [
+        { resolutionBias: faceDetectorOutput },
+        { binned: true },
+        { fps: 30 },
+      ] satisfies Constraint[],
+    [faceDetectorOutput],
   );
 
   const overlayStyle = useAnimatedStyle(() => ({
@@ -80,15 +140,15 @@ export function CameraViewfinder() {
     }
 
     fetchPokemon(PIKACHU_ID)
-      .then((data) => {
+      .then(data => {
         if (isMountedRef.current) {
           setPokemon(data);
         }
       })
       .catch(() => {});
 
-    const subscription = AppState.addEventListener('change', (nextState) => {
-      setAppIsActive(nextState === 'active');
+    const subscription = AppState.addEventListener("change", nextState => {
+      setAppIsActive(nextState === "active");
     });
 
     return () => {
@@ -96,29 +156,6 @@ export function CameraViewfinder() {
       subscription.remove();
     };
   }, [canRequestPermission, hasPermission, requestPermission]);
-
-  const handleFacesDetected = useCallback(
-    (faces: Face[]) => {
-      if (faces.length === 0) {
-        setHasFace(false);
-        overlayOpacity.value = withTiming(0, { duration: 150 });
-        return;
-      }
-
-      const face = faces[0];
-      const position = getPokemonOverlayPosition(face.bounds, face.landmarks, face.contours);
-
-      setHasFace(true);
-      overlayX.value = withTiming(position.left, { duration: 100 });
-      overlayY.value = withTiming(position.top, { duration: 100 });
-      overlayOpacity.value = withTiming(1, { duration: 100 });
-    },
-    [overlayOpacity, overlayX, overlayY],
-  );
-
-  const handleFaceDetectionError = useCallback((error: Error) => {
-    console.error('Face detection error:', error);
-  }, []);
 
   const handleCapture = useCallback(async () => {
     if (isCapturing) return;
@@ -135,27 +172,23 @@ export function CameraViewfinder() {
   }, [isCapturing, photoOutput]);
 
   const handleFlipCamera = useCallback(() => {
-    setCameraFacing((current) => (current === 'front' ? 'back' : 'front'));
+    setCameraFacing(current => (current === "front" ? "back" : "front"));
+    hasFaceRef.current = false;
     setHasFace(false);
     overlayOpacity.value = 0;
+    lastOverlayPositionRef.current = { left: 0, top: 0 };
   }, [overlayOpacity]);
 
   if (!hasPermission) {
     return (
       <View style={styles.centered}>
-        <Text className="mb-6 text-center text-base text-white">
-          Camera access is needed to try on Pokémon
-        </Text>
+        <Text className="mb-6 text-center text-base text-white">Camera access is needed to try on Pokémon</Text>
         {canRequestPermission ? (
-          <Pressable
-            onPress={requestPermission}
-            className="rounded-full bg-white px-6 py-3 active:opacity-80">
+          <Pressable onPress={requestPermission} className="rounded-full bg-white px-6 py-3 active:opacity-80">
             <Text className="text-base font-semibold text-[#173EA5]">Allow Camera</Text>
           </Pressable>
         ) : (
-          <Text className="text-center text-sm text-white/70">
-            Enable camera access in system settings
-          </Text>
+          <Text className="text-center text-sm text-white/70">Enable camera access in system settings</Text>
         )}
       </View>
     );
@@ -172,25 +205,21 @@ export function CameraViewfinder() {
   return (
     <View style={styles.container}>
       <Camera
+        key={cameraFacing}
         ref={cameraRef}
         style={StyleSheet.absoluteFill}
         device={cameraDevice}
         isActive={isCameraActive}
         mirrorMode="auto"
-        outputs={[photoOutput]}
-        onFacesDetected={handleFacesDetected}
+        outputs={[faceDetectorOutput, photoOutput]}
+        constraints={constraints}
         onError={handleFaceDetectionError}
-        {...faceDetectorOptions}
       />
 
-      <FlipCameraButton onPress={handleFlipCamera} />
-
       <View
-        style={[
-          styles.guideLayer,
-          { paddingTop: insets.top, paddingBottom: insets.bottom + 88 },
-        ]}
-        pointerEvents="box-none">
+        style={[styles.guideLayer, { paddingTop: insets.top, paddingBottom: insets.bottom + 88 }]}
+        pointerEvents="box-none"
+      >
         {!hasFace ? (
           <View style={styles.silhouetteFrame}>
             <HeadSilhouette />
@@ -204,10 +233,12 @@ export function CameraViewfinder() {
         </Animated.View>
       ) : null}
 
-      <View
-        style={[styles.shutterContainer, { bottom: insets.bottom + 24 }]}
-        pointerEvents="box-none">
+      <View style={[styles.controlsContainer, { bottom: insets.bottom + 24 }]} pointerEvents="box-none">
+        <View style={styles.controlsSide} />
         <ShutterButton onPress={handleCapture} disabled={isCapturing} />
+        <View style={styles.controlsSideRight}>
+          <FlipCameraButton onPress={handleFlipCamera} />
+        </View>
       </View>
     </View>
   );
@@ -216,33 +247,43 @@ export function CameraViewfinder() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#000',
+    backgroundColor: "#000",
   },
   centered: {
     flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#000',
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#000",
     paddingHorizontal: 32,
   },
   guideLayer: {
     ...StyleSheet.absoluteFillObject,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   silhouetteFrame: {
     width: SILHOUETTE_WIDTH,
     height: SILHOUETTE_HEIGHT,
+    paddingTop: 108,
   },
   overlayHost: {
-    position: 'absolute',
+    position: "absolute",
     width: POKEMON_SPRITE_SIZE,
     height: POKEMON_SPRITE_SIZE,
   },
-  shutterContainer: {
-    position: 'absolute',
+  controlsContainer: {
+    position: "absolute",
     left: 0,
     right: 0,
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  controlsSide: {
+    flex: 1,
+  },
+  controlsSideRight: {
+    flex: 1,
+    justifyContent: "center",
+    paddingLeft: 24,
   },
 });
