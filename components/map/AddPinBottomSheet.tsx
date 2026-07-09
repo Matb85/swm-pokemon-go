@@ -67,13 +67,22 @@ export const AddPinBottomSheet = forwardRef<AddPinBottomSheetRef, AddPinBottomSh
     }, []);
 
     useEffect(() => {
+      const prefetchStart = Date.now();
+      if (__DEV__) console.log('[AddPinBottomSheet] prefetch started', { pageSize: PAGE_SIZE });
       setLoading(true);
       loadPokemon(0, true)
         .catch(() => {
           setPokemon([]);
           setHasMore(false);
         })
-        .finally(() => setLoading(false));
+        .finally(() => {
+          if (__DEV__) {
+            console.log('[AddPinBottomSheet] prefetch finished', {
+              prefetchMs: Date.now() - prefetchStart,
+            });
+          }
+          setLoading(false);
+        });
     }, [loadPokemon]);
 
     const filteredPokemon = useMemo(() => {

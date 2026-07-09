@@ -19,7 +19,14 @@ export function MapContent() {
   const [pendingCoordinate, setPendingCoordinate] = useState<[number, number] | null>(null);
 
   useEffect(() => {
+    if (__DEV__) console.log('[MapContent] mounted', { pinCount: pins.length });
+    const mapboxInitStart = Date.now();
     ensureMapboxInitialized();
+    if (__DEV__) {
+      console.log('[MapContent] ensureMapboxInitialized finished', {
+        mapboxInitMs: Date.now() - mapboxInitStart,
+      });
+    }
   }, []);
 
   const handleMapLongPress = useCallback((feature: GeoJSON.Feature) => {
@@ -61,6 +68,15 @@ export function MapContent() {
         scaleBarEnabled={false}
         logoEnabled={false}
         attributionEnabled={false}
+        onWillStartLoadingMap={() => {
+          if (__DEV__) console.log('[MapContent] MapView will start loading');
+        }}
+        onDidFinishLoadingStyle={() => {
+          if (__DEV__) console.log('[MapContent] MapView style loaded');
+        }}
+        onDidFinishLoadingMap={() => {
+          if (__DEV__) console.log('[MapContent] MapView map loaded');
+        }}
         onLongPress={handleMapLongPress}>
         <Camera
           ref={cameraRef}

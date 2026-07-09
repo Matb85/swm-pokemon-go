@@ -1,4 +1,5 @@
 import { CameraErrorBoundary } from '@/components/camera/CameraErrorBoundary';
+import { useIsFocused } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { lazy, Suspense } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
@@ -18,13 +19,19 @@ function CameraLoading() {
 }
 
 export default function CameraScreen() {
+  const isFocused = useIsFocused();
+
   return (
     <View style={styles.container}>
       <StatusBar style="light" />
       <CameraErrorBoundary>
-        <Suspense fallback={<CameraLoading />}>
-          <CameraViewfinder />
-        </Suspense>
+        {isFocused ? (
+          <Suspense fallback={<CameraLoading />}>
+            <CameraViewfinder />
+          </Suspense>
+        ) : (
+          <CameraLoading />
+        )}
       </CameraErrorBoundary>
     </View>
   );

@@ -75,6 +75,8 @@ export function CameraViewfinder() {
   const [compositorRequest, setCompositorRequest] = useState<CompositorRequest | null>(null);
   const hasFaceRef = useRef(false);
   const lastOverlayPositionRef = useRef({ left: 0, top: 0 });
+  const captureSessionRef = useRef(0);
+  const compositorSessionRef = useRef<number | null>(null);
 
   const overlayX = useSharedValue(0);
   const overlayY = useSharedValue(0);
@@ -82,6 +84,20 @@ export function CameraViewfinder() {
 
   const cameraDevice = useCameraDevice(cameraFacing);
   const isCameraActive = isFocused && appIsActive && hasPermission && !!cameraDevice;
+
+  const abortCapture = useCallback(() => {
+    captureSessionRef.current += 1;
+    compositorSessionRef.current = null;
+
+    if (!isMountedRef.current) {
+      return;
+    }
+
+    setCompositorRequest(null);
+    setIsCapturing(false);
+    setCapturePhase(null);
+    setCaptureIncludesOverlay(false);
+  }, []);
 
   const faceDetectorSettings = useMemo(
     () => ({
@@ -102,6 +118,10 @@ export function CameraViewfinder() {
 
   const handleFacesDetected = useCallback(
     (faces: Face[]) => {
+      if (!isCameraActive) {
+        return;
+      }
+
       if (faces.length === 0) {
         if (hasFaceRef.current) {
           hasFaceRef.current = false;
@@ -134,7 +154,7 @@ export function CameraViewfinder() {
       overlayX.value = position.left;
       overlayY.value = position.top;
     },
-    [overlayOpacity, overlayX, overlayY],
+    [isCameraActive, overlayOpacity, overlayX, overlayY],
   );
 
   const handleFaceDetectionError = useCallback((error: Error) => {
@@ -189,17 +209,16 @@ export function CameraViewfinder() {
   }, [canRequestPermission, hasPermission, requestPermission]);
 
   useEffect(() => {
-    if (!isCapturing) {
-      return;
+    if (!isFocused || !appIsActive) {
+      abortCapture();
     }
+  }, [abortCapture, appIsActive, isFocused]);
 
+  useEffect(() => {
     return () => {
-      setCompositorRequest(null);
-      setIsCapturing(false);
-      setCapturePhase(null);
-      setCaptureIncludesOverlay(false);
+      abortCapture();
     };
-  }, [isCapturing]);
+  }, [abortCapture]);
 
   const finishCapture = useCallback(() => {
     setIsCapturing(false);
@@ -208,19 +227,35 @@ export function CameraViewfinder() {
   }, []);
 
   const runCapture = useCallback(async () => {
+    const sessionId = captureSessionRef.current;
+    const isCaptureActive = () => sessionId === captureSessionRef.current && isMountedRef.current;
     let needsCompositor = false;
+    let capturedPhoto: Awaited<ReturnType<typeof photoOutput.capturePhoto>> | null = null;
 
     try {
+      if (!isCaptureActive()) {
+        return;
+      }
+
       setCapturePhase("capturing");
-      const photo = await withTimeout(
+      capturedPhoto = await withTimeout(
         photoOutput.capturePhoto({}, {}),
         CAPTURE_TIMEOUT_MS,
         "Photo capture timed out",
       );
 
+      if (!isCaptureActive()) {
+        return;
+      }
+
       setCapturePhase("processing");
-      const prepared = await prepareCapturedPhoto(photo, width, height, cameraFacing);
-      photo.dispose();
+      const prepared = await prepareCapturedPhoto(capturedPhoto, width, height, cameraFacing);
+      capturedPhoto.dispose();
+      capturedPhoto = null;
+
+      if (!isCaptureActive()) {
+        return;
+      }
 
       const overlayPosition =
         hasFaceRef.current && pokemon
@@ -232,6 +267,7 @@ export function CameraViewfinder() {
 
       if (includesOverlay && overlayPosition && pokemon) {
         needsCompositor = true;
+        compositorSessionRef.current = sessionId;
         setCompositorRequest({
           photoUri: prepared.uri,
           photoWidth: prepared.width,
@@ -246,16 +282,29 @@ export function CameraViewfinder() {
 
       setCapturePhase("saving");
       const saved = await savePhotoToGallery(prepared.uri);
+
+      if (!isCaptureActive()) {
+        return;
+      }
+
       if (saved) {
         setCapturePhase("success");
         await wait(SUCCESS_DISPLAY_MS);
       } else {
         Alert.alert("Permission needed", "Allow photo library access to save photos.");
       }
-    } catch {
+    } catch (error) {
+      if (capturedPhoto) {
+        capturedPhoto.dispose();
+      }
+
+      if (!isCaptureActive()) {
+        return;
+      }
+
       Alert.alert("Error", "Could not take the photo. Please try again.");
     } finally {
-      if (!needsCompositor) {
+      if (!needsCompositor && isCaptureActive()) {
         finishCapture();
       }
     }
@@ -276,10 +325,22 @@ export function CameraViewfinder() {
 
   const handleCompositorComplete = useCallback(
     async (uri: string) => {
+      const sessionId = compositorSessionRef.current;
+      if (sessionId === null || sessionId !== captureSessionRef.current) {
+        return;
+      }
+
       setCompositorRequest(null);
+      compositorSessionRef.current = null;
+
       try {
         setCapturePhase("saving");
         const saved = await savePhotoToGallery(uri);
+
+        if (sessionId !== captureSessionRef.current || !isMountedRef.current) {
+          return;
+        }
+
         if (saved) {
           setCapturePhase("success");
           await wait(SUCCESS_DISPLAY_MS);
@@ -287,9 +348,15 @@ export function CameraViewfinder() {
           Alert.alert("Permission needed", "Allow photo library access to save photos.");
         }
       } catch {
+        if (sessionId !== captureSessionRef.current || !isMountedRef.current) {
+          return;
+        }
+
         Alert.alert("Error", "Could not save the photo. Please try again.");
       } finally {
-        finishCapture();
+        if (sessionId === captureSessionRef.current && isMountedRef.current) {
+          finishCapture();
+        }
       }
     },
     [finishCapture],
@@ -297,7 +364,13 @@ export function CameraViewfinder() {
 
   const handleCompositorError = useCallback(
     (error: Error) => {
+      const sessionId = compositorSessionRef.current;
+      if (sessionId === null || sessionId !== captureSessionRef.current) {
+        return;
+      }
+
       console.error("Photo compositor error:", error);
+      compositorSessionRef.current = null;
       setCompositorRequest(null);
       Alert.alert("Error", "Could not add the Pokémon overlay to your photo. Please try again.");
       finishCapture();

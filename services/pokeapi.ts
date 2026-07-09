@@ -112,6 +112,7 @@ export async function fetchPokemonListWithDetails(
   limit = 20,
   options: FetchPokemonListOptions = {}
 ) {
+  const apiStart = Date.now();
   if (options.type) {
     const allIds = await fetchPokemonIdsByType(options.type);
     const pageIds = allIds.slice(offset, offset + limit);
@@ -127,6 +128,15 @@ export async function fetchPokemonListWithDetails(
   const ids = page.results.map((result) => extractIdFromUrl(result.url)).filter((id) => id > 0);
   const pokemon = await Promise.all(ids.map((id) => fetchPokemon(id)));
 
+  if (__DEV__) {
+    console.log('[pokeapi] fetchPokemonListWithDetails completed', {
+      offset,
+      limit,
+      requestCount: 1 + ids.length,
+      apiMs: Date.now() - apiStart,
+    });
+  }
+
   return {
     pokemon,
     hasMore: page.hasMore,
@@ -136,6 +146,14 @@ export async function fetchPokemonListWithDetails(
 export async function fetchPokemonByIds(ids: number[]): Promise<Pokemon[]> {
   if (ids.length === 0) return [];
 
+  const apiStart = Date.now();
   const pokemon = await Promise.all(ids.map((id) => fetchPokemon(id)));
+  if (__DEV__) {
+    console.log('[pokeapi] fetchPokemonByIds completed', {
+      idCount: ids.length,
+      requestCount: ids.length,
+      apiMs: Date.now() - apiStart,
+    });
+  }
   return pokemon;
 }

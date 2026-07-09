@@ -3,9 +3,19 @@ import { isMapboxConfigured } from '@/lib/mapbox';
 import { Suspense, lazy } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 
-const LazyMapContent = lazy(() =>
-  import('@/components/map/MapContent').then((module) => ({ default: module.MapContent }))
-);
+const LazyMapContent = lazy(() => {
+  const chunkLoadStart = Date.now();
+  if (__DEV__) console.log('[MapScreen] MapContent chunk load started');
+
+  return import('@/components/map/MapContent').then((module) => {
+    if (__DEV__) {
+      console.log('[MapScreen] MapContent chunk load finished', {
+        chunkLoadMs: Date.now() - chunkLoadStart,
+      });
+    }
+    return { default: module.MapContent };
+  });
+});
 
 function MapUnavailable() {
   return (
@@ -30,6 +40,10 @@ function MapLoading() {
 }
 
 export default function MapScreen() {
+  if (__DEV__) {
+    console.log('[MapScreen] render', { configured: isMapboxConfigured() });
+  }
+
   if (!isMapboxConfigured()) {
     return <MapUnavailable />;
   }

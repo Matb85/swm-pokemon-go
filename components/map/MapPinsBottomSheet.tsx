@@ -30,11 +30,16 @@ export function MapPinsBottomSheet({ pins, onDeletePin }: MapPinsBottomSheetProp
   useEffect(() => {
     const ids = [...new Set(pins.map((pin) => pin.pokemonId))];
     if (ids.length === 0) {
+      if (__DEV__) console.log('[MapPinsBottomSheet] skipped fetch', { pinCount: 0 });
       setPokemonById({});
       return;
     }
 
     let cancelled = false;
+    const fetchStart = Date.now();
+    if (__DEV__) {
+      console.log('[MapPinsBottomSheet] fetch started', { uniquePinCount: ids.length, ids });
+    }
     setLoading(true);
 
     fetchPokemonByIds(ids)
@@ -49,6 +54,12 @@ export function MapPinsBottomSheet({ pins, onDeletePin }: MapPinsBottomSheetProp
       })
       .finally(() => {
         if (!cancelled) {
+          if (__DEV__) {
+            console.log('[MapPinsBottomSheet] fetch finished', {
+              fetchMs: Date.now() - fetchStart,
+              uniquePinCount: ids.length,
+            });
+          }
           setLoading(false);
         }
       });
