@@ -31,6 +31,10 @@ export function CaptureCompositor({ request, onComplete, onError }: CaptureCompo
   const hasReportedErrorRef = useRef(false);
 
   useEffect(() => {
+    if (!request?.photoUri) {
+      return;
+    }
+
     setPhotoLoaded(false);
     hasReportedErrorRef.current = false;
   }, [request?.photoUri]);
@@ -48,7 +52,7 @@ export function CaptureCompositor({ request, onComplete, onError }: CaptureCompo
     }, COMPOSITOR_TIMEOUT_MS);
 
     return () => clearTimeout(timeout);
-  }, [onComplete, onError, photoLoaded, request]);
+  }, [onError, photoLoaded, request]);
 
   useEffect(() => {
     if (!request || !photoLoaded || hasReportedErrorRef.current) {

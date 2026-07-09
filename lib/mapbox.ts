@@ -16,7 +16,6 @@ export function ensureMapboxInitialized() {
     return;
   }
 
-  // biome-ignore lint/style/noRestrictedImports: defer native Mapbox binding until the map tab mounts
   const Mapbox = require('@rnmapbox/maps').default;
   Mapbox.setAccessToken(MAPBOX_ACCESS_TOKEN);
   mapboxInitialized = true;

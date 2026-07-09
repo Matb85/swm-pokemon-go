@@ -19,7 +19,7 @@ export function MapContent() {
   const [pendingCoordinate, setPendingCoordinate] = useState<[number, number] | null>(null);
 
   useEffect(() => {
-    if (__DEV__) console.log('[MapContent] mounted', { pinCount: pins.length });
+    if (__DEV__) console.log('[MapContent] mounted');
     const mapboxInitStart = Date.now();
     ensureMapboxInitialized();
     if (__DEV__) {

@@ -293,7 +293,7 @@ export function CameraViewfinder() {
       } else {
         Alert.alert("Permission needed", "Allow photo library access to save photos.");
       }
-    } catch (error) {
+    } catch (_error) {
       if (capturedPhoto) {
         capturedPhoto.dispose();
       }
