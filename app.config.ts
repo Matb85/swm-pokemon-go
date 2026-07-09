@@ -16,6 +16,14 @@ export default ({ config }: ConfigContext): ExpoConfig => {
             'Allow $(PRODUCT_NAME) to use your location to center the map on your position.',
         },
       ],
+      [
+        'expo-media-library',
+        {
+          photosPermission: 'Allow $(PRODUCT_NAME) to access your photos.',
+          savePhotosPermission: 'Allow $(PRODUCT_NAME) to save photos to your gallery.',
+          isAccessMediaLocationEnabled: false,
+        },
+      ],
     ],
     ios: {
       ...config.ios,

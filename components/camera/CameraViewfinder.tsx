@@ -1,9 +1,10 @@
 import { Text } from "@/components/ui/text";
+import { prepareCapturedPhoto, savePhotoToGallery, scaleOverlayToPhoto } from "@/lib/camera-photo";
 import { getPokemonOverlayPosition, POKEMON_SPRITE_SIZE } from "@/lib/face-overlay";
 import { fetchPokemon, type Pokemon } from "@/services/pokeapi";
 import { useIsFocused } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AppState, Pressable, StyleSheet, useWindowDimensions, View } from "react-native";
+import { Alert, AppState, Pressable, StyleSheet, useWindowDimensions, View } from "react-native";
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
@@ -17,19 +18,46 @@ import {
   type Constraint,
 } from "react-native-vision-camera";
 import { useFaceDetectorOutput, type Face } from "react-native-vision-camera-face-detector";
+import { CaptureCompositor, type CompositorRequest } from "./CaptureCompositor";
+import { CaptureProcessingOverlay, type CapturePhase } from "./CaptureProcessingOverlay";
 import { FlipCameraButton } from "./FlipCameraButton";
 import { HeadSilhouette, SILHOUETTE_HEIGHT, SILHOUETTE_WIDTH } from "./HeadSilhouette";
 import { PokemonOverlay } from "./PokemonOverlay";
 import { ShutterButton } from "./ShutterButton";
+import { ShutterFlash, type ShutterFlashRef } from "./ShutterFlash";
 
 const PIKACHU_ID = 25;
 const OVERLAY_POSITION_THRESHOLD = 4;
+const SUCCESS_DISPLAY_MS = 1200;
+const CAPTURE_TIMEOUT_MS = 20000;
+
+function wait(ms: number) {
+  return new Promise<void>(resolve => {
+    setTimeout(resolve, ms);
+  });
+}
+
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(message)), timeoutMs);
+    promise
+      .then(value => {
+        clearTimeout(timer);
+        resolve(value);
+      })
+      .catch(error => {
+        clearTimeout(timer);
+        reject(error);
+      });
+  });
+}
 
 export function CameraViewfinder() {
   const isFocused = useIsFocused();
   const insets = useSafeAreaInsets();
   const { width, height } = useWindowDimensions();
   const cameraRef = useRef<CameraRef>(null);
+  const shutterFlashRef = useRef<ShutterFlashRef>(null);
   const photoOutput = usePhotoOutput({
     targetResolution: CommonResolutions.HD_4_3,
     qualityPrioritization: "speed",
@@ -39,9 +67,12 @@ export function CameraViewfinder() {
   const { hasPermission, requestPermission, canRequestPermission } = useCameraPermission();
   const [pokemon, setPokemon] = useState<Pokemon | null>(null);
   const [isCapturing, setIsCapturing] = useState(false);
+  const [capturePhase, setCapturePhase] = useState<CapturePhase | null>(null);
+  const [captureIncludesOverlay, setCaptureIncludesOverlay] = useState(false);
   const [cameraFacing, setCameraFacing] = useState<CameraPosition>("front");
   const [hasFace, setHasFace] = useState(false);
   const [appIsActive, setAppIsActive] = useState(AppState.currentState === "active");
+  const [compositorRequest, setCompositorRequest] = useState<CompositorRequest | null>(null);
   const hasFaceRef = useRef(false);
   const lastOverlayPositionRef = useRef({ left: 0, top: 0 });
 
@@ -157,27 +188,132 @@ export function CameraViewfinder() {
     };
   }, [canRequestPermission, hasPermission, requestPermission]);
 
-  const handleCapture = useCallback(async () => {
+  useEffect(() => {
+    if (!isCapturing) {
+      return;
+    }
+
+    return () => {
+      setCompositorRequest(null);
+      setIsCapturing(false);
+      setCapturePhase(null);
+      setCaptureIncludesOverlay(false);
+    };
+  }, [isCapturing]);
+
+  const finishCapture = useCallback(() => {
+    setIsCapturing(false);
+    setCapturePhase(null);
+    setCaptureIncludesOverlay(false);
+  }, []);
+
+  const runCapture = useCallback(async () => {
+    let needsCompositor = false;
+
+    try {
+      setCapturePhase("capturing");
+      const photo = await withTimeout(
+        photoOutput.capturePhoto({}, {}),
+        CAPTURE_TIMEOUT_MS,
+        "Photo capture timed out",
+      );
+
+      setCapturePhase("processing");
+      const prepared = await prepareCapturedPhoto(photo, width, height, cameraFacing);
+      photo.dispose();
+
+      const overlayPosition =
+        hasFaceRef.current && pokemon
+          ? scaleOverlayToPhoto(lastOverlayPositionRef.current, width, height, prepared.width, prepared.height)
+          : null;
+
+      const includesOverlay = Boolean(overlayPosition && pokemon);
+      setCaptureIncludesOverlay(includesOverlay);
+
+      if (includesOverlay && overlayPosition && pokemon) {
+        needsCompositor = true;
+        setCompositorRequest({
+          photoUri: prepared.uri,
+          photoWidth: prepared.width,
+          photoHeight: prepared.height,
+          overlay: {
+            pokemon,
+            ...overlayPosition,
+          },
+        });
+        return;
+      }
+
+      setCapturePhase("saving");
+      const saved = await savePhotoToGallery(prepared.uri);
+      if (saved) {
+        setCapturePhase("success");
+        await wait(SUCCESS_DISPLAY_MS);
+      } else {
+        Alert.alert("Permission needed", "Allow photo library access to save photos.");
+      }
+    } catch {
+      Alert.alert("Error", "Could not take the photo. Please try again.");
+    } finally {
+      if (!needsCompositor) {
+        finishCapture();
+      }
+    }
+  }, [cameraFacing, finishCapture, height, photoOutput, pokemon, width]);
+
+  const handleCapture = useCallback(() => {
     if (isCapturing) return;
 
     setIsCapturing(true);
-    try {
-      const photo = await photoOutput.capturePhoto({}, {});
-      photo.dispose();
-    } finally {
-      if (isMountedRef.current) {
-        setIsCapturing(false);
+    setCapturePhase("capturing");
+    setCaptureIncludesOverlay(hasFaceRef.current);
+    shutterFlashRef.current?.trigger();
+
+    requestAnimationFrame(() => {
+      void runCapture();
+    });
+  }, [isCapturing, runCapture]);
+
+  const handleCompositorComplete = useCallback(
+    async (uri: string) => {
+      setCompositorRequest(null);
+      try {
+        setCapturePhase("saving");
+        const saved = await savePhotoToGallery(uri);
+        if (saved) {
+          setCapturePhase("success");
+          await wait(SUCCESS_DISPLAY_MS);
+        } else {
+          Alert.alert("Permission needed", "Allow photo library access to save photos.");
+        }
+      } catch {
+        Alert.alert("Error", "Could not save the photo. Please try again.");
+      } finally {
+        finishCapture();
       }
-    }
-  }, [isCapturing, photoOutput]);
+    },
+    [finishCapture],
+  );
+
+  const handleCompositorError = useCallback(
+    (error: Error) => {
+      console.error("Photo compositor error:", error);
+      setCompositorRequest(null);
+      Alert.alert("Error", "Could not add the Pokémon overlay to your photo. Please try again.");
+      finishCapture();
+    },
+    [finishCapture],
+  );
 
   const handleFlipCamera = useCallback(() => {
+    if (isCapturing) return;
+
     setCameraFacing(current => (current === "front" ? "back" : "front"));
     hasFaceRef.current = false;
     setHasFace(false);
     overlayOpacity.value = 0;
     lastOverlayPositionRef.current = { left: 0, top: 0 };
-  }, [overlayOpacity]);
+  }, [isCapturing, overlayOpacity]);
 
   if (!hasPermission) {
     return (
@@ -211,10 +347,15 @@ export function CameraViewfinder() {
         device={cameraDevice}
         isActive={isCameraActive}
         mirrorMode="auto"
+        orientationSource="interface"
         outputs={[faceDetectorOutput, photoOutput]}
         constraints={constraints}
         onError={handleFaceDetectionError}
       />
+
+      <ShutterFlash ref={shutterFlashRef} />
+
+      <CaptureProcessingOverlay phase={capturePhase} includesOverlay={captureIncludesOverlay} />
 
       <View
         style={[styles.guideLayer, { paddingTop: insets.top, paddingBottom: insets.bottom + 88 }]}
@@ -235,11 +376,17 @@ export function CameraViewfinder() {
 
       <View style={[styles.controlsContainer, { bottom: insets.bottom + 24 }]} pointerEvents="box-none">
         <View style={styles.controlsSide} />
-        <ShutterButton onPress={handleCapture} disabled={isCapturing} />
+        <ShutterButton onPress={handleCapture} disabled={isCapturing} processing={isCapturing} />
         <View style={styles.controlsSideRight}>
-          <FlipCameraButton onPress={handleFlipCamera} />
+          <FlipCameraButton onPress={handleFlipCamera} disabled={isCapturing} />
         </View>
       </View>
+
+      <CaptureCompositor
+        request={compositorRequest}
+        onComplete={handleCompositorComplete}
+        onError={handleCompositorError}
+      />
     </View>
   );
 }
