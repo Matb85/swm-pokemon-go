@@ -3,7 +3,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, RefreshControl, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { FilterButtons } from '@/components/pokemon/FilterButtons';
-import { FilterPickerModal } from '@/components/pokemon/FilterPickerModal';
+import {
+  FilterPickerBottomSheet,
+  type FilterPickerBottomSheetRef,
+} from '@/components/pokemon/FilterPickerBottomSheet';
 import { usePokemonBottomSheet } from '@/components/pokemon/PokemonBottomSheet';
 import { PokemonCard } from '@/components/pokemon/PokemonCard';
 import { SearchBar } from '@/components/pokemon/SearchBar';
@@ -39,12 +42,11 @@ export default function PokedexScreen() {
   const { openPokemon } = usePokemonBottomSheet();
   const isMountedRef = useRef(false);
   const loadMoreLockRef = useRef(false);
+  const filterSheetRef = useRef<FilterPickerBottomSheetRef>(null);
 
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState<PokedexTypeFilter>(null);
   const [sortOrder, setSortOrder] = useState<PokedexSortOrder>('name-asc');
-  const [typePickerVisible, setTypePickerVisible] = useState(false);
-  const [sortPickerVisible, setSortPickerVisible] = useState(false);
   const [pokemon, setPokemon] = useState<Pokemon[]>([]);
   const [offset, setOffset] = useState(0);
   const [hasMore, setHasMore] = useState(true);
@@ -171,18 +173,36 @@ export default function PokedexScreen() {
 
   const getFixedItemSize = useCallback(() => LIST_ITEM_SIZE, []);
 
+  const handleTypePress = useCallback(() => {
+    filterSheetRef.current?.present({
+      title: 'Filter by type',
+      options: POKEDEX_TYPE_OPTIONS,
+      selectedValue: typeFilter,
+      onSelect: setTypeFilter,
+    });
+  }, [typeFilter]);
+
+  const handleSortPress = useCallback(() => {
+    filterSheetRef.current?.present({
+      title: 'Sort by',
+      options: POKEDEX_SORT_OPTIONS,
+      selectedValue: sortOrder,
+      onSelect: setSortOrder,
+    });
+  }, [sortOrder]);
+
   const listHeader = useMemo(
     () => (
       <View className="pb-4 pt-2">
         <FilterButtons
           typeFilter={getTypeFilterLabel(typeFilter)}
           sortOrder={getSortLabel(sortOrder)}
-          onTypePress={() => setTypePickerVisible(true)}
-          onSortPress={() => setSortPickerVisible(true)}
+          onTypePress={handleTypePress}
+          onSortPress={handleSortPress}
         />
       </View>
     ),
-    [typeFilter, sortOrder]
+    [typeFilter, sortOrder, handleTypePress, handleSortPress]
   );
 
   const listFooter = useMemo(
@@ -224,23 +244,7 @@ export default function PokedexScreen() {
         onEndReachedThreshold={0.4}
       />
 
-      <FilterPickerModal
-        visible={typePickerVisible}
-        title="Filter by type"
-        options={POKEDEX_TYPE_OPTIONS}
-        selectedValue={typeFilter}
-        onSelect={setTypeFilter}
-        onClose={() => setTypePickerVisible(false)}
-      />
-
-      <FilterPickerModal
-        visible={sortPickerVisible}
-        title="Sort by"
-        options={POKEDEX_SORT_OPTIONS}
-        selectedValue={sortOrder}
-        onSelect={setSortOrder}
-        onClose={() => setSortPickerVisible(false)}
-      />
+      <FilterPickerBottomSheet ref={filterSheetRef} />
     </SafeAreaView>
   );
 }
