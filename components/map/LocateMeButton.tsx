@@ -1,5 +1,5 @@
 import { LocateFixed } from 'lucide-react-native';
-import { useCallback, useState } from 'react';
+import { useState } from 'react';
 import { ActivityIndicator, Pressable } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -11,7 +11,7 @@ export function LocateMeButton({ onLocate }: LocateMeButtonProps) {
   const insets = useSafeAreaInsets();
   const [locating, setLocating] = useState(false);
 
-  const handlePress = useCallback(async () => {
+  const handlePress = async () => {
     if (locating) return;
 
     setLocating(true);
@@ -20,7 +20,7 @@ export function LocateMeButton({ onLocate }: LocateMeButtonProps) {
     } finally {
       setLocating(false);
     }
-  }, [locating, onLocate]);
+  };
 
   return (
     <Pressable

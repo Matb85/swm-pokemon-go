@@ -1,5 +1,5 @@
 import { LegendList } from '@legendapp/list/react-native';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { usePokemonBottomSheet } from '@/components/pokemon/PokemonBottomSheet';
@@ -66,38 +66,25 @@ export default function FavoriteScreen() {
       });
   }, [favoriteIds]);
 
-  const handlePokemonPress = useCallback(
-    (id: number) => {
-      openPokemon(id);
-    },
-    [openPokemon]
+  const handlePokemonPress = (id: number) => {
+    openPokemon(id);
+  };
+
+  const renderItem = ({ item }: { item: Pokemon }) => (
+    <View style={{ marginBottom: ITEM_GAP }}>
+      <PokemonCard pokemon={item} onPress={() => handlePokemonPress(item.id)} />
+    </View>
   );
 
-  const renderItem = useCallback(
-    ({ item }: { item: Pokemon }) => (
-      <View style={{ marginBottom: ITEM_GAP }}>
-        <PokemonCard pokemon={item} onPress={() => handlePokemonPress(item.id)} />
-      </View>
-    ),
-    [handlePokemonPress]
-  );
-
-  const keyExtractor = useCallback((item: Pokemon) => item.id.toString(), []);
-
-  const getFixedItemSize = useCallback(() => LIST_ITEM_SIZE, []);
-
-  const listHeader = useMemo(
-    () => (
-      <View className="pb-4 pt-2">
-        <Text className="text-2xl font-semibold text-black">Favorites</Text>
-        {pokemon.length > 0 ? (
-          <Text className="mt-1 text-sm text-[#999]">
-            {pokemon.length} Pokémon{pokemon.length === 1 ? '' : 's'} saved
-          </Text>
-        ) : null}
-      </View>
-    ),
-    [pokemon.length]
+  const listHeader = (
+    <View className="pb-4 pt-2">
+      <Text className="text-2xl font-semibold text-black">Favorites</Text>
+      {pokemon.length > 0 ? (
+        <Text className="mt-1 text-sm text-[#999]">
+          {pokemon.length} Pokémon{pokemon.length === 1 ? '' : 's'} saved
+        </Text>
+      ) : null}
+    </View>
   );
 
   if (loading) {
@@ -113,11 +100,11 @@ export default function FavoriteScreen() {
       <LegendList
         data={pokemon}
         extraData={favoriteIds}
-        keyExtractor={keyExtractor}
+        keyExtractor={(item) => item.id.toString()}
         renderItem={renderItem}
         recycleItems
         estimatedItemSize={LIST_ITEM_SIZE}
-        getFixedItemSize={getFixedItemSize}
+        getFixedItemSize={() => LIST_ITEM_SIZE}
         contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 16 }}
         ListHeaderComponent={listHeader}
         ListEmptyComponent={EmptyFavorites}

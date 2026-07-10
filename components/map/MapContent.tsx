@@ -1,5 +1,5 @@
 import Mapbox, { Camera, type CameraRef, MapView, MarkerView } from '@rnmapbox/maps';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { View } from 'react-native';
 import { AddPinBottomSheet, type AddPinBottomSheetRef } from '@/components/map/AddPinBottomSheet';
 import { LocateMeButton } from '@/components/map/LocateMeButton';
@@ -29,26 +29,23 @@ export function MapContent() {
     }
   }, []);
 
-  const handleMapLongPress = useCallback((feature: GeoJSON.Feature) => {
+  const handleMapLongPress = (feature: GeoJSON.Feature) => {
     const geometry = feature.geometry;
     if (geometry.type !== 'Point') return;
 
     const coordinate = geometry.coordinates as [number, number];
     setPendingCoordinate(coordinate);
     addPinSheetRef.current?.present(coordinate);
-  }, []);
+  };
 
-  const handleSelectPokemon = useCallback(
-    (pokemonId: number) => {
-      if (!pendingCoordinate) return;
+  const handleSelectPokemon = (pokemonId: number) => {
+    if (!pendingCoordinate) return;
 
-      addPin(createMapPin(pokemonId, pendingCoordinate));
-      setPendingCoordinate(null);
-    },
-    [addPin, pendingCoordinate]
-  );
+    addPin(createMapPin(pokemonId, pendingCoordinate));
+    setPendingCoordinate(null);
+  };
 
-  const handleLocateMe = useCallback(async () => {
+  const handleLocateMe = async () => {
     const coordinate = await getUserCoordinate();
     if (!coordinate) return;
 
@@ -57,7 +54,7 @@ export function MapContent() {
       zoomLevel: USER_LOCATION_ZOOM,
       animationDuration: 1000,
     });
-  }, []);
+  };
 
   return (
     <View className="flex-1 bg-[#f5f5f5]">

@@ -8,10 +8,8 @@ import {
 import { Search } from 'lucide-react-native';
 import {
   forwardRef,
-  useCallback,
   useEffect,
   useImperativeHandle,
-  useMemo,
   useRef,
   useState,
 } from 'react';
@@ -24,6 +22,7 @@ import { fetchPokemonListWithDetails, type Pokemon } from '@/services/pokeapi';
 
 const TAB_BAR_HEIGHT = 72;
 const PAGE_SIZE = 20;
+const SNAP_POINTS = ['65%'];
 
 export type AddPinBottomSheetRef = {
   present: (coordinate: [number, number]) => void;
@@ -46,7 +45,6 @@ export const AddPinBottomSheet = forwardRef<AddPinBottomSheetRef, AddPinBottomSh
     const [loading, setLoading] = useState(false);
     const [loadingMore, setLoadingMore] = useState(false);
 
-    const snapPoints = useMemo(() => ['65%'], []);
     const tabBarInset = TAB_BAR_HEIGHT + insets.bottom;
 
     useImperativeHandle(ref, () => ({
@@ -59,45 +57,49 @@ export const AddPinBottomSheet = forwardRef<AddPinBottomSheetRef, AddPinBottomSh
       },
     }));
 
-    const loadPokemon = useCallback(async (nextOffset: number, reset = false) => {
+    const loadPokemon = async (nextOffset: number, reset = false) => {
       const page = await fetchPokemonListWithDetails(nextOffset, PAGE_SIZE);
       setPokemon((current) => (reset ? page.pokemon : [...current, ...page.pokemon]));
       setOffset(nextOffset + PAGE_SIZE);
       setHasMore(page.hasMore);
-    }, []);
+    };
 
     useEffect(() => {
       const prefetchStart = Date.now();
       if (__DEV__) console.log('[AddPinBottomSheet] prefetch started', { pageSize: PAGE_SIZE });
       setLoading(true);
-      loadPokemon(0, true)
-        .catch(() => {
+
+      (async () => {
+        try {
+          const page = await fetchPokemonListWithDetails(0, PAGE_SIZE);
+          setPokemon(page.pokemon);
+          setOffset(PAGE_SIZE);
+          setHasMore(page.hasMore);
+        } catch {
           setPokemon([]);
           setHasMore(false);
-        })
-        .finally(() => {
+        } finally {
           if (__DEV__) {
             console.log('[AddPinBottomSheet] prefetch finished', {
               prefetchMs: Date.now() - prefetchStart,
             });
           }
           setLoading(false);
-        });
-    }, [loadPokemon]);
+        }
+      })();
+    }, []);
 
-    const filteredPokemon = useMemo(() => {
-      const query = search.trim().toLowerCase();
-      if (!query) return pokemon;
+    const query = search.trim().toLowerCase();
+    const filteredPokemon = query
+      ? pokemon.filter((item) => {
+          const name = item.name.toLowerCase();
+          const formatted = formatPokemonName(item.name).toLowerCase();
+          const id = item.id.toString();
+          return name.includes(query) || formatted.includes(query) || id.includes(query);
+        })
+      : pokemon;
 
-      return pokemon.filter((item) => {
-        const name = item.name.toLowerCase();
-        const formatted = formatPokemonName(item.name).toLowerCase();
-        const id = item.id.toString();
-        return name.includes(query) || formatted.includes(query) || id.includes(query);
-      });
-    }, [pokemon, search]);
-
-    const handleLoadMore = useCallback(async () => {
+    const handleLoadMore = async () => {
       if (loadingMore || !hasMore || search.trim()) return;
 
       setLoadingMore(true);
@@ -106,66 +108,50 @@ export const AddPinBottomSheet = forwardRef<AddPinBottomSheetRef, AddPinBottomSh
       } finally {
         setLoadingMore(false);
       }
-    }, [hasMore, loadingMore, loadPokemon, offset, search]);
+    };
 
-    const handleSelect = useCallback(
-      (item: Pokemon) => {
-        onSelectPokemon(item.id);
-        sheetRef.current?.dismiss();
-      },
-      [onSelectPokemon]
-    );
+    const handleSelect = (item: Pokemon) => {
+      onSelectPokemon(item.id);
+      sheetRef.current?.dismiss();
+    };
 
-    const handleDismiss = useCallback(() => {
+    const handleDismiss = () => {
       setSearch('');
       onDismiss?.();
-    }, [onDismiss]);
+    };
 
-    const renderBackdrop = useCallback(
-      (props: BottomSheetBackdropProps) => (
-        <BottomSheetBackdrop
-          {...props}
-          disappearsOnIndex={-1}
-          appearsOnIndex={0}
-          opacity={0.45}
-          style={{ bottom: tabBarInset }}
-        />
-      ),
-      [tabBarInset]
+    const renderBackdrop = (props: BottomSheetBackdropProps) => (
+      <BottomSheetBackdrop
+        {...props}
+        disappearsOnIndex={-1}
+        appearsOnIndex={0}
+        opacity={0.45}
+        style={{ bottom: tabBarInset }}
+      />
     );
 
-    const renderItem = useCallback(
-      ({ item }: { item: Pokemon }) => (
-        <View style={{ marginBottom: POKEMON_LIST_ITEM_GAP }}>
-          <PokemonListCard pokemon={item} onPress={() => handleSelect(item)} />
-        </View>
-      ),
-      [handleSelect]
+    const renderItem = ({ item }: { item: Pokemon }) => (
+      <View style={{ marginBottom: POKEMON_LIST_ITEM_GAP }}>
+        <PokemonListCard pokemon={item} onPress={() => handleSelect(item)} />
+      </View>
     );
 
-    const listFooter = useMemo(
-      () =>
-        loadingMore ? (
-          <View className="py-4">
-            <ActivityIndicator color="#173EA5" />
-          </View>
-        ) : null,
-      [loadingMore]
-    );
+    const listFooter = loadingMore ? (
+      <View className="py-4">
+        <ActivityIndicator color="#173EA5" />
+      </View>
+    ) : null;
 
-    const listEmpty = useMemo(
-      () => (
-        <View className="items-center py-10">
-          <Text className="text-sm text-[#999]">No Pokémon found.</Text>
-        </View>
-      ),
-      []
+    const listEmpty = (
+      <View className="items-center py-10">
+        <Text className="text-sm text-[#999]">No Pokémon found.</Text>
+      </View>
     );
 
     return (
       <BottomSheetModal
         ref={sheetRef}
-        snapPoints={snapPoints}
+        snapPoints={SNAP_POINTS}
         enablePanDownToClose
         backdropComponent={renderBackdrop}
         bottomInset={tabBarInset}

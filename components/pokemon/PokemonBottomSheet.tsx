@@ -8,11 +8,9 @@ import {
   createContext,
   forwardRef,
   type ReactNode,
-  useCallback,
   useContext,
   useEffect,
   useImperativeHandle,
-  useMemo,
   useRef,
   useState,
 } from 'react';
@@ -21,6 +19,7 @@ import { PokemonDetailContent } from '@/components/pokemon/PokemonDetailContent'
 import { fetchPokemon } from '@/services/pokeapi';
 
 const TAB_BAR_HEIGHT = 72;
+const SNAP_POINTS = ['55%', '90%'];
 
 export type PokemonBottomSheetRef = {
   present: (id: number) => void;
@@ -44,14 +43,12 @@ export function usePokemonBottomSheet() {
 export function PokemonBottomSheetProvider({ children }: { children: ReactNode }) {
   const sheetRef = useRef<PokemonBottomSheetRef>(null);
 
-  const openPokemon = useCallback((id: number) => {
+  const openPokemon = (id: number) => {
     sheetRef.current?.present(id);
-  }, []);
-
-  const value = useMemo(() => ({ openPokemon }), [openPokemon]);
+  };
 
   return (
-    <PokemonBottomSheetContext.Provider value={value}>
+    <PokemonBottomSheetContext.Provider value={{ openPokemon }}>
       {children}
       <PokemonBottomSheet ref={sheetRef} />
     </PokemonBottomSheetContext.Provider>
@@ -65,8 +62,6 @@ export const PokemonBottomSheet = forwardRef<PokemonBottomSheetRef>(
     const [pokemonId, setPokemonId] = useState<number | null>(null);
     const [loading, setLoading] = useState(false);
     const [pokemon, setPokemon] = useState<Awaited<ReturnType<typeof fetchPokemon>> | null>(null);
-
-    const snapPoints = useMemo(() => ['55%', '90%'], []);
 
     useImperativeHandle(ref, () => ({
       present(id: number) {
@@ -91,28 +86,25 @@ export const PokemonBottomSheet = forwardRef<PokemonBottomSheetRef>(
 
     const tabBarInset = TAB_BAR_HEIGHT + insets.bottom;
 
-    const renderBackdrop = useCallback(
-      (props: BottomSheetBackdropProps) => (
-        <BottomSheetBackdrop
-          {...props}
-          disappearsOnIndex={-1}
-          appearsOnIndex={0}
-          opacity={0.45}
-          style={{ bottom: tabBarInset }}
-        />
-      ),
-      [tabBarInset]
+    const renderBackdrop = (props: BottomSheetBackdropProps) => (
+      <BottomSheetBackdrop
+        {...props}
+        disappearsOnIndex={-1}
+        appearsOnIndex={0}
+        opacity={0.45}
+        style={{ bottom: tabBarInset }}
+      />
     );
 
-    const handleDismiss = useCallback(() => {
+    const handleDismiss = () => {
       setPokemonId(null);
       setPokemon(null);
-    }, []);
+    };
 
     return (
       <BottomSheetModal
         ref={sheetRef}
-        snapPoints={snapPoints}
+        snapPoints={SNAP_POINTS}
         enablePanDownToClose
         backdropComponent={renderBackdrop}
         bottomInset={tabBarInset}

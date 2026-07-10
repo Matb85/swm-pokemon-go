@@ -7,10 +7,7 @@ import {
 import { Check } from 'lucide-react-native';
 import {
   forwardRef,
-  memo,
-  useCallback,
   useImperativeHandle,
-  useMemo,
   useRef,
   useState,
 } from 'react';
@@ -19,6 +16,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text } from '@/components/ui/text';
 
 const TAB_BAR_HEIGHT = 72;
+const SNAP_POINTS = ['70%'];
 
 type FilterOption<T extends string | null> = {
   value: T;
@@ -43,11 +41,7 @@ type FilterOptionRowProps = {
   onPress: () => void;
 };
 
-const FilterOptionRow = memo(function FilterOptionRow({
-  label,
-  isSelected,
-  onPress,
-}: FilterOptionRowProps) {
+function FilterOptionRow({ label, isSelected, onPress }: FilterOptionRowProps) {
   return (
     <Pressable
       onPress={onPress}
@@ -61,7 +55,7 @@ const FilterOptionRow = memo(function FilterOptionRow({
       {isSelected ? <Check size={18} color="#173EA5" /> : null}
     </Pressable>
   );
-});
+}
 
 export const FilterPickerBottomSheet = forwardRef<FilterPickerBottomSheetRef>(
   function FilterPickerBottomSheet(_, ref) {
@@ -76,7 +70,6 @@ export const FilterPickerBottomSheet = forwardRef<FilterPickerBottomSheetRef>(
     });
     const [, setRevision] = useState(0);
 
-    const snapPoints = useMemo(() => ['70%'], []);
     const tabBarInset = TAB_BAR_HEIGHT + insets.bottom;
     const { title, options, selectedValue } = configRef.current;
 
@@ -99,47 +92,38 @@ export const FilterPickerBottomSheet = forwardRef<FilterPickerBottomSheetRef>(
       },
     }));
 
-    const handleSelect = useCallback((value: string | null) => {
+    const handleSelect = (value: string | null) => {
       onSelectRef.current(value);
       sheetRef.current?.dismiss();
-    }, []);
+    };
 
-    const renderBackdrop = useCallback(
-      (props: BottomSheetBackdropProps) => (
-        <BottomSheetBackdrop
-          {...props}
-          disappearsOnIndex={-1}
-          appearsOnIndex={0}
-          opacity={0.45}
-          pressBehavior="close"
-          style={{ bottom: tabBarInset }}
-        />
-      ),
-      [tabBarInset]
+    const renderBackdrop = (props: BottomSheetBackdropProps) => (
+      <BottomSheetBackdrop
+        {...props}
+        disappearsOnIndex={-1}
+        appearsOnIndex={0}
+        opacity={0.45}
+        pressBehavior="close"
+        style={{ bottom: tabBarInset }}
+      />
     );
 
-    const renderItem = useCallback(
-      ({ item }: { item: FilterOption<string | null> }) => (
-        <FilterOptionRow
-          label={item.label}
-          isSelected={item.value === selectedValue}
-          onPress={() => handleSelect(item.value)}
-        />
-      ),
-      [selectedValue, handleSelect]
+    const renderItem = ({ item }: { item: FilterOption<string | null> }) => (
+      <FilterOptionRow
+        label={item.label}
+        isSelected={item.value === selectedValue}
+        onPress={() => handleSelect(item.value)}
+      />
     );
 
-    const keyExtractor = useCallback((item: FilterOption<string | null>) => item.label, []);
-
-    const listHeader = useMemo(
-      () => <Text className="px-4 pb-3 pt-1 text-lg font-semibold text-black">{title}</Text>,
-      [title]
+    const listHeader = (
+      <Text className="px-4 pb-3 pt-1 text-lg font-semibold text-black">{title}</Text>
     );
 
     return (
       <BottomSheetModal
         ref={sheetRef}
-        snapPoints={snapPoints}
+        snapPoints={SNAP_POINTS}
         enablePanDownToClose
         backdropComponent={renderBackdrop}
         bottomInset={tabBarInset}
@@ -147,7 +131,7 @@ export const FilterPickerBottomSheet = forwardRef<FilterPickerBottomSheetRef>(
         handleIndicatorStyle={{ backgroundColor: '#e6e6e6', width: 40 }}>
         <BottomSheetFlatList
           data={options}
-          keyExtractor={keyExtractor}
+          keyExtractor={(item) => item.label}
           renderItem={renderItem}
           ListHeaderComponent={listHeader}
           contentContainerStyle={{ paddingHorizontal: 8, paddingBottom: insets.bottom + 16 }}

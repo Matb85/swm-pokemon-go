@@ -1,5 +1,5 @@
 import { LegendList } from '@legendapp/list/react-native';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, RefreshControl, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { FilterButtons } from '@/components/pokemon/FilterButtons';
@@ -63,38 +63,44 @@ export default function PokedexScreen() {
     };
   }, []);
 
-  const loadPokemon = useCallback(
-    async (nextOffset: number, reset = false) => {
-      const page = await fetchPokemonListWithDetails(nextOffset, PAGE_SIZE, {
-        type: typeFilter,
-      });
+  const loadPokemon = async (nextOffset: number, reset = false) => {
+    const page = await fetchPokemonListWithDetails(nextOffset, PAGE_SIZE, {
+      type: typeFilter,
+    });
 
-      if (!isMountedRef.current) return;
+    if (!isMountedRef.current) return;
 
-      setPokemon((current) => (reset ? page.pokemon : [...current, ...page.pokemon]));
-      setOffset(nextOffset + PAGE_SIZE);
-      setHasMore(page.hasMore);
-    },
-    [typeFilter]
-  );
+    setPokemon((current) => (reset ? page.pokemon : [...current, ...page.pokemon]));
+    setOffset(nextOffset + PAGE_SIZE);
+    setHasMore(page.hasMore);
+  };
 
   useEffect(() => {
     setLoading(true);
     setCanLoadMore(false);
 
-    loadPokemon(0, true)
-      .catch(() => {
+    (async () => {
+      try {
+        const page = await fetchPokemonListWithDetails(0, PAGE_SIZE, {
+          type: typeFilter,
+        });
+        if (!isMountedRef.current) return;
+
+        setPokemon(page.pokemon);
+        setOffset(PAGE_SIZE);
+        setHasMore(page.hasMore);
+      } catch {
         if (isMountedRef.current) {
           setPokemon([]);
           setHasMore(false);
         }
-      })
-      .finally(() => {
+      } finally {
         if (isMountedRef.current) {
           setLoading(false);
         }
-      });
-  }, [loadPokemon]);
+      }
+    })();
+  }, [typeFilter]);
 
   useEffect(() => {
     if (loading) {
@@ -109,21 +115,19 @@ export default function PokedexScreen() {
     });
   }, [loading]);
 
-  const filteredPokemon = useMemo(() => {
-    const query = search.trim().toLowerCase();
-    const matchesSearch = query
-      ? pokemon.filter((item) => {
-          const name = item.name.toLowerCase();
-          const formatted = formatPokemonName(item.name).toLowerCase();
-          const id = item.id.toString();
-          return name.includes(query) || formatted.includes(query) || id.includes(query);
-        })
-      : pokemon;
+  const query = search.trim().toLowerCase();
+  const matchesSearch = query
+    ? pokemon.filter((item) => {
+        const name = item.name.toLowerCase();
+        const formatted = formatPokemonName(item.name).toLowerCase();
+        const id = item.id.toString();
+        return name.includes(query) || formatted.includes(query) || id.includes(query);
+      })
+    : pokemon;
 
-    return sortPokemon(matchesSearch, sortOrder);
-  }, [pokemon, search, sortOrder]);
+  const filteredPokemon = sortPokemon(matchesSearch, sortOrder);
 
-  const handleRefresh = useCallback(async () => {
+  const handleRefresh = async () => {
     if (!isMountedRef.current) return;
 
     setRefreshing(true);
@@ -134,9 +138,9 @@ export default function PokedexScreen() {
         setRefreshing(false);
       }
     }
-  }, [loadPokemon]);
+  };
 
-  const handleLoadMore = useCallback(async () => {
+  const handleLoadMore = async () => {
     if (!canLoadMore || !isMountedRef.current || loadMoreLockRef.current) return;
     if (!hasMore || loadingMore || loading || search.trim()) return;
 
@@ -151,69 +155,52 @@ export default function PokedexScreen() {
       }
       loadMoreLockRef.current = false;
     }
-  }, [canLoadMore, hasMore, loadingMore, loading, search, offset, loadPokemon]);
+  };
 
-  const handlePokemonPress = useCallback(
-    (id: number) => {
-      openPokemon(id);
-    },
-    [openPokemon]
+  const handlePokemonPress = (id: number) => {
+    openPokemon(id);
+  };
+
+  const renderItem = ({ item }: { item: Pokemon }) => (
+    <View style={{ marginBottom: ITEM_GAP }}>
+      <PokemonCard pokemon={item} onPress={() => handlePokemonPress(item.id)} />
+    </View>
   );
 
-  const renderItem = useCallback(
-    ({ item }: { item: Pokemon }) => (
-      <View style={{ marginBottom: ITEM_GAP }}>
-        <PokemonCard pokemon={item} onPress={() => handlePokemonPress(item.id)} />
-      </View>
-    ),
-    [handlePokemonPress]
-  );
-
-  const keyExtractor = useCallback((item: Pokemon) => item.id.toString(), []);
-
-  const getFixedItemSize = useCallback(() => LIST_ITEM_SIZE, []);
-
-  const handleTypePress = useCallback(() => {
+  const handleTypePress = () => {
     filterSheetRef.current?.present({
       title: 'Filter by type',
       options: POKEDEX_TYPE_OPTIONS,
       selectedValue: typeFilter,
       onSelect: setTypeFilter,
     });
-  }, [typeFilter]);
+  };
 
-  const handleSortPress = useCallback(() => {
+  const handleSortPress = () => {
     filterSheetRef.current?.present({
       title: 'Sort by',
       options: POKEDEX_SORT_OPTIONS,
       selectedValue: sortOrder,
       onSelect: setSortOrder,
     });
-  }, [sortOrder]);
+  };
 
-  const listHeader = useMemo(
-    () => (
-      <View className="pb-4 pt-2">
-        <FilterButtons
-          typeFilter={getTypeFilterLabel(typeFilter)}
-          sortOrder={getSortLabel(sortOrder)}
-          onTypePress={handleTypePress}
-          onSortPress={handleSortPress}
-        />
-      </View>
-    ),
-    [typeFilter, sortOrder, handleTypePress, handleSortPress]
+  const listHeader = (
+    <View className="pb-4 pt-2">
+      <FilterButtons
+        typeFilter={getTypeFilterLabel(typeFilter)}
+        sortOrder={getSortLabel(sortOrder)}
+        onTypePress={handleTypePress}
+        onSortPress={handleSortPress}
+      />
+    </View>
   );
 
-  const listFooter = useMemo(
-    () =>
-      loadingMore ? (
-        <View className="py-4">
-          <ActivityIndicator color="#173EA5" />
-        </View>
-      ) : null,
-    [loadingMore]
-  );
+  const listFooter = loadingMore ? (
+    <View className="py-4">
+      <ActivityIndicator color="#173EA5" />
+    </View>
+  ) : null;
 
   if (loading) {
     return (
@@ -230,11 +217,11 @@ export default function PokedexScreen() {
       <LegendList
         data={filteredPokemon}
         extraData={favoriteIds}
-        keyExtractor={keyExtractor}
+        keyExtractor={(item) => item.id.toString()}
         renderItem={renderItem}
         recycleItems
         estimatedItemSize={LIST_ITEM_SIZE}
-        getFixedItemSize={getFixedItemSize}
+        getFixedItemSize={() => LIST_ITEM_SIZE}
         contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 16 }}
         ListHeaderComponent={listHeader}
         ListEmptyComponent={EmptyList}
