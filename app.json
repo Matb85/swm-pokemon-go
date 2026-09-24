@@ -7,7 +7,9 @@
     "icon": "./assets/icon.png",
     "scheme": "swm-pokemon-go",
     "userInterfaceStyle": "automatic",
-    "assetBundlePatterns": ["**/*"],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.swm.pokemongo"
@@ -50,7 +52,8 @@
       "@rnmapbox/maps"
     ],
     "experiments": {
-      "typedRoutes": true
+      "typedRoutes": true,
+      "reactCompiler": true
     }
   }
 }
